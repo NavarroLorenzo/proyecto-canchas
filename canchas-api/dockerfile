@@ -1,0 +1,21 @@
+# Etapa de compilación
+FROM golang:1.24 AS builder
+WORKDIR /app
+
+# Copiamos archivos de dependencias
+COPY go.mod go.sum ./
+
+# Descargamos dependencias
+RUN go mod download
+
+# Copiamos el resto del código
+COPY . .
+
+# Compilamos el binario
+RUN CGO_ENABLED=0 GOOS=linux go build -o main ./cmd/main.go
+
+# Etapa final mínima
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/main .
+CMD ["./main"]

@@ -1,0 +1,119 @@
+version: '3.8'
+
+services:
+  # MySQL Database (para users-api)
+  mysql:
+    image: mysql:8.0
+    container_name: users_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: users_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # MongoDB (para canchas-api y reservas-api)
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # RabbitMQ (para mensajería entre microservicios)
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"   # Puerto AMQP
+      - "15672:15672" # Puerto Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+
+  # Users API
+  users-api:
+    build:
+      context: ./users-api
+      dockerfile: Dockerfile
+    container_name: users_api
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=users_db
+      - JWT_SECRET=mi_clave_secreta_super_segura_123
+      - JWT_EXPIRATION_HOURS=24
+      - PORT=8080
+      - GIN_MODE=debug
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # Canchas API
+  canchas-api:
+    build:
+      context: ./canchas-api
+      dockerfile: Dockerfile
+    container_name: canchas_api
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - GIN_MODE=debug
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DATABASE=canchas_db
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=canchas_events
+      - RABBITMQ_QUEUE=canchas_queue
+      - USERS_API_URL=http://users-api:8080
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      users-api:
+        condition: service_started
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+  mongodb_data:
+  rabbitmq_data:
+
+networks:
+  app-network:
+    driver: bridge
