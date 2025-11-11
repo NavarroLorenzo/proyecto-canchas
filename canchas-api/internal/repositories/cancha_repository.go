@@ -17,21 +17,19 @@ type CanchaRepository interface {
 	GetAll() ([]domain.Cancha, error)
 	Update(id string, cancha *domain.Cancha) error
 	Delete(id string) error
-	GetByOwnerID(ownerID uint) ([]domain.Cancha, error)
+	// ❌ ELIMINAR: GetByOwnerID(ownerID uint) ([]domain.Cancha, error)
 }
 
 type canchaRepository struct {
 	collection *mongo.Collection
 }
 
-// NewCanchaRepository crea una nueva instancia del repositorio
 func NewCanchaRepository(db *mongo.Database) CanchaRepository {
 	return &canchaRepository{
 		collection: db.Collection(domain.Cancha{}.CollectionName()),
 	}
 }
 
-// Create crea una nueva cancha en MongoDB
 func (r *canchaRepository) Create(cancha *domain.Cancha) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -44,7 +42,6 @@ func (r *canchaRepository) Create(cancha *domain.Cancha) error {
 	return err
 }
 
-// GetByID obtiene una cancha por su ID
 func (r *canchaRepository) GetByID(id string) (*domain.Cancha, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -66,7 +63,6 @@ func (r *canchaRepository) GetByID(id string) (*domain.Cancha, error) {
 	return &cancha, nil
 }
 
-// GetAll obtiene todas las canchas
 func (r *canchaRepository) GetAll() ([]domain.Cancha, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -85,7 +81,6 @@ func (r *canchaRepository) GetAll() ([]domain.Cancha, error) {
 	return canchas, nil
 }
 
-// Update actualiza una cancha existente
 func (r *canchaRepository) Update(id string, cancha *domain.Cancha) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -124,7 +119,6 @@ func (r *canchaRepository) Update(id string, cancha *domain.Cancha) error {
 	return nil
 }
 
-// Delete elimina una cancha
 func (r *canchaRepository) Delete(id string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -146,21 +140,4 @@ func (r *canchaRepository) Delete(id string) error {
 	return nil
 }
 
-// GetByOwnerID obtiene todas las canchas de un owner específico
-func (r *canchaRepository) GetByOwnerID(ownerID uint) ([]domain.Cancha, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	cursor, err := r.collection.Find(ctx, bson.M{"owner_id": ownerID})
-	if err != nil {
-		return nil, err
-	}
-	defer cursor.Close(ctx)
-
-	var canchas []domain.Cancha
-	if err := cursor.All(ctx, &canchas); err != nil {
-		return nil, err
-	}
-
-	return canchas, nil
-}
+// ❌ ELIMINAR método GetByOwnerID

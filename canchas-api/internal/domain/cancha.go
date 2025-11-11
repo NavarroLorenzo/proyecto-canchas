@@ -17,9 +17,9 @@ type Cancha struct {
 	Capacity    int                `bson:"capacity" json:"capacity"`
 	Available   bool               `bson:"available" json:"available"`
 	ImageURL    string             `bson:"image_url" json:"image_url"`
-	OwnerID     uint               `bson:"owner_id" json:"owner_id"` // ID del usuario dueño
-	CreatedAt   time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt   time.Time          `bson:"updated_at" json:"updated_at"`
+	// ❌ ELIMINAR: OwnerID     uint               `bson:"owner_id" json:"owner_id"`
+	CreatedAt time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt time.Time `bson:"updated_at" json:"updated_at"`
 }
 
 // CollectionName retorna el nombre de la colección en MongoDB

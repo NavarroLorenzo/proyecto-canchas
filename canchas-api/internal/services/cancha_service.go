@@ -1,12 +1,10 @@
 package services
 
 import (
-	"canchas-api/internal/clients"
 	"canchas-api/internal/domain"
 	"canchas-api/internal/dto"
 	"canchas-api/internal/messaging"
 	"canchas-api/internal/repositories"
-	"errors"
 	"time"
 )
 
@@ -16,35 +14,27 @@ type CanchaService interface {
 	GetAll() (*dto.CanchasListResponse, error)
 	Update(id string, req *dto.UpdateCanchaRequest) (*dto.CanchaResponse, error)
 	Delete(id string) error
-	GetByOwnerID(ownerID uint) (*dto.CanchasListResponse, error)
 }
 
 type canchaService struct {
-	repo       repositories.CanchaRepository
-	userClient clients.UserClient
-	publisher  messaging.RabbitMQPublisher
+	repo      repositories.CanchaRepository
+	publisher messaging.RabbitMQPublisher
 }
 
 // NewCanchaService crea una nueva instancia del servicio
 func NewCanchaService(
 	repo repositories.CanchaRepository,
-	userClient clients.UserClient,
 	publisher messaging.RabbitMQPublisher,
 ) CanchaService {
 	return &canchaService{
-		repo:       repo,
-		userClient: userClient,
-		publisher:  publisher,
+		repo:      repo,
+		publisher: publisher,
 	}
 }
 
 // Create crea una nueva cancha
 func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaResponse, error) {
-	// Validar que el owner existe en users-api
-	exists, err := s.userClient.ValidateUser(req.OwnerID)
-	if err != nil || !exists {
-		return nil, errors.New("invalid owner: user does not exist")
-	}
+	// ❌ ELIMINAR validación de owner (ya no es necesario)
 
 	// Crear la cancha
 	cancha := &domain.Cancha{
@@ -57,7 +47,7 @@ func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaRespons
 		Capacity:    req.Capacity,
 		Available:   req.Available,
 		ImageURL:    req.ImageURL,
-		OwnerID:     req.OwnerID,
+		// ❌ ELIMINAR: OwnerID:     req.OwnerID,
 	}
 
 	if err := s.repo.Create(cancha); err != nil {
@@ -73,8 +63,6 @@ func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaRespons
 		Timestamp: time.Now().Unix(),
 	}
 	if err := s.publisher.PublishEvent(event); err != nil {
-		// Log error pero no fallar la operación
-		// En producción podrías usar un sistema de retry
 		println("Warning: failed to publish event:", err.Error())
 	}
 
@@ -111,13 +99,11 @@ func (s *canchaService) GetAll() (*dto.CanchasListResponse, error) {
 
 // Update actualiza una cancha existente
 func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.CanchaResponse, error) {
-	// Obtener la cancha existente
 	existing, err := s.repo.GetByID(id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Actualizar solo los campos proporcionados
 	if req.Name != "" {
 		existing.Name = req.Name
 	}
@@ -150,7 +136,6 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 		return nil, err
 	}
 
-	// Publicar evento a RabbitMQ
 	event := messaging.Event{
 		Type:      "update",
 		Entity:    "cancha",
@@ -167,7 +152,6 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 
 // Delete elimina una cancha
 func (s *canchaService) Delete(id string) error {
-	// Verificar que la cancha existe
 	cancha, err := s.repo.GetByID(id)
 	if err != nil {
 		return err
@@ -177,7 +161,6 @@ func (s *canchaService) Delete(id string) error {
 		return err
 	}
 
-	// Publicar evento a RabbitMQ
 	event := messaging.Event{
 		Type:      "delete",
 		Entity:    "cancha",
@@ -190,24 +173,6 @@ func (s *canchaService) Delete(id string) error {
 	}
 
 	return nil
-}
-
-// GetByOwnerID obtiene todas las canchas de un owner
-func (s *canchaService) GetByOwnerID(ownerID uint) (*dto.CanchasListResponse, error) {
-	canchas, err := s.repo.GetByOwnerID(ownerID)
-	if err != nil {
-		return nil, err
-	}
-
-	responses := make([]dto.CanchaResponse, len(canchas))
-	for i, cancha := range canchas {
-		responses[i] = *s.domainToResponse(&cancha)
-	}
-
-	return &dto.CanchasListResponse{
-		Canchas: responses,
-		Total:   int64(len(canchas)),
-	}, nil
 }
 
 // domainToResponse convierte una Cancha del dominio a CanchaResponse DTO
@@ -223,8 +188,8 @@ func (s *canchaService) domainToResponse(cancha *domain.Cancha) *dto.CanchaRespo
 		Capacity:    cancha.Capacity,
 		Available:   cancha.Available,
 		ImageURL:    cancha.ImageURL,
-		OwnerID:     cancha.OwnerID,
-		CreatedAt:   cancha.CreatedAt,
-		UpdatedAt:   cancha.UpdatedAt,
+		// ❌ ELIMINAR: OwnerID:     cancha.OwnerID,
+		CreatedAt: cancha.CreatedAt,
+		UpdatedAt: cancha.UpdatedAt,
 	}
 }

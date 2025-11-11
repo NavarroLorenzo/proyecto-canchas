@@ -1,13 +1,14 @@
 package main
 
 import (
-	"canchas-api/config"
-	"canchas-api/internal/controllers"
-	"canchas-api/internal/messaging"
-	"canchas-api/internal/repositories"
-	"canchas-api/internal/services"
 	"context"
 	"log"
+	"reservas-api/config"
+	"reservas-api/internal/clients"
+	"reservas-api/internal/controllers"
+	"reservas-api/internal/messaging"
+	"reservas-api/internal/repositories"
+	"reservas-api/internal/services"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -16,23 +17,36 @@ import (
 )
 
 func main() {
+	// Cargar configuración
 	config.LoadConfig()
+
+	// Conectar a MongoDB
 	db := connectMongoDB()
 
+	// Conectar a RabbitMQ
 	publisher, err := messaging.NewRabbitMQPublisher()
 	if err != nil {
 		log.Fatalf("Failed to connect to RabbitMQ: %v", err)
 	}
 	defer publisher.Close()
 
-	// ❌ ELIMINAR: userClient := clients.NewUserClient()
+	// Inicializar clientes HTTP
+	userClient := clients.NewUserClient()
+	canchaClient := clients.NewCanchaClient()
 
-	canchaRepo := repositories.NewCanchaRepository(db)
-	canchaService := services.NewCanchaService(canchaRepo, publisher) // Sin userClient
-	canchaController := controllers.NewCanchaController(canchaService)
+	// Inicializar repositorios
+	reservaRepo := repositories.NewReservaRepository(db)
 
-	router := setupRouter(canchaController)
+	// Inicializar servicios
+	reservaService := services.NewReservaService(reservaRepo, userClient, canchaClient, publisher)
 
+	// Inicializar controladores
+	reservaController := controllers.NewReservaController(reservaService)
+
+	// Configurar Gin
+	router := setupRouter(reservaController)
+
+	// Iniciar servidor
 	port := config.AppConfig.Port
 	log.Printf("Server starting on port %s", port)
 	if err := router.Run(":" + port); err != nil {
@@ -40,12 +54,14 @@ func main() {
 	}
 }
 
+// connectMongoDB establece la conexión con MongoDB
 func connectMongoDB() *mongo.Database {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	clientOptions := options.Client().ApplyURI(config.AppConfig.MongoURI)
 
+	// Reintentar conexión hasta 30 veces
 	var client *mongo.Client
 	var err error
 
@@ -67,31 +83,38 @@ func connectMongoDB() *mongo.Database {
 	return nil
 }
 
-func setupRouter(canchaController *controllers.CanchaController) *gin.Engine {
+// setupRouter configura las rutas de la API
+func setupRouter(reservaController *controllers.ReservaController) *gin.Engine {
 	router := gin.Default()
+
+	// Middleware CORS
 	router.Use(corsMiddleware())
 
+	// Health check
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status":  "ok",
-			"service": "canchas-api",
+			"service": "reservas-api",
 		})
 	})
 
-	// Rutas públicas (cualquiera puede ver canchas)
-	router.GET("/canchas", canchaController.GetAll)
-	router.GET("/canchas/:id", canchaController.GetByID)
-
-	// Rutas protegidas (SOLO ADMIN puede crear/editar/eliminar)
-	// Por ahora sin middleware, pero deberías añadirlo
-	router.POST("/canchas", canchaController.Create)       // TODO: Añadir AdminMiddleware
-	router.PUT("/canchas/:id", canchaController.Update)    // TODO: Añadir AdminMiddleware
-	router.DELETE("/canchas/:id", canchaController.Delete) // TODO: Añadir AdminMiddleware
+	// Rutas de reservas
+	reservas := router.Group("/reservas")
+	{
+		reservas.POST("", reservaController.Create)
+		reservas.GET("", reservaController.GetAll)
+		reservas.GET("/:id", reservaController.GetByID)
+		reservas.PUT("/:id", reservaController.Update)
+		reservas.DELETE("/:id", reservaController.Cancel)
+		reservas.GET("/user/:user_id", reservaController.GetByUserID)
+		reservas.GET("/cancha/:cancha_id", reservaController.GetByCanchaID)
+	}
 
 	log.Println("Routes configured successfully")
 	return router
 }
 
+// corsMiddleware configura CORS para desarrollo
 func corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")

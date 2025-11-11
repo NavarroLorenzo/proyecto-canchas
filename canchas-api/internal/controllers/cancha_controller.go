@@ -4,7 +4,6 @@ import (
 	"canchas-api/internal/dto"
 	"canchas-api/internal/services"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,12 +12,11 @@ type CanchaController struct {
 	service services.CanchaService
 }
 
-// NewCanchaController crea una nueva instancia del controlador
 func NewCanchaController(service services.CanchaService) *CanchaController {
 	return &CanchaController{service: service}
 }
 
-// Create maneja la creación de una cancha
+// Create maneja la creación de una cancha (SOLO ADMIN)
 // POST /canchas
 func (ctrl *CanchaController) Create(c *gin.Context) {
 	var req dto.CreateCanchaRequest
@@ -33,12 +31,7 @@ func (ctrl *CanchaController) Create(c *gin.Context) {
 
 	cancha, err := ctrl.service.Create(&req)
 	if err != nil {
-		statusCode := http.StatusInternalServerError
-		if err.Error() == "invalid owner: user does not exist" {
-			statusCode = http.StatusBadRequest
-		}
-
-		c.JSON(statusCode, dto.ErrorResponse{
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "Failed to create cancha",
 			Message: err.Error(),
 		})
@@ -85,7 +78,7 @@ func (ctrl *CanchaController) GetAll(c *gin.Context) {
 	c.JSON(http.StatusOK, canchas)
 }
 
-// Update actualiza una cancha existente
+// Update actualiza una cancha existente (SOLO ADMIN)
 // PUT /canchas/:id
 func (ctrl *CanchaController) Update(c *gin.Context) {
 	id := c.Param("id")
@@ -116,7 +109,7 @@ func (ctrl *CanchaController) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, cancha)
 }
 
-// Delete elimina una cancha
+// Delete elimina una cancha (SOLO ADMIN)
 // DELETE /canchas/:id
 func (ctrl *CanchaController) Delete(c *gin.Context) {
 	id := c.Param("id")
@@ -139,27 +132,4 @@ func (ctrl *CanchaController) Delete(c *gin.Context) {
 	})
 }
 
-// GetByOwnerID obtiene todas las canchas de un owner
-// GET /canchas/owner/:owner_id
-func (ctrl *CanchaController) GetByOwnerID(c *gin.Context) {
-	ownerIDStr := c.Param("owner_id")
-	ownerID, err := strconv.ParseUint(ownerIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
-			Error:   "Invalid owner ID",
-			Message: "Owner ID must be a valid number",
-		})
-		return
-	}
-
-	canchas, err := ctrl.service.GetByOwnerID(uint(ownerID))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
-			Error:   "Failed to get canchas",
-			Message: err.Error(),
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, canchas)
-}
+// ❌ ELIMINAR método GetByOwnerID

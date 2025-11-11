@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// CreateCanchaRequest - DTO para crear una cancha
+// CreateCanchaRequest - DTO para crear una cancha (SOLO ADMIN)
 type CreateCanchaRequest struct {
 	Name        string  `json:"name" binding:"required,min=3"`
 	Type        string  `json:"type" binding:"required,oneof=futbol tenis basquet paddle voley"`
@@ -15,10 +15,10 @@ type CreateCanchaRequest struct {
 	Capacity    int     `json:"capacity" binding:"required,gt=0"`
 	Available   bool    `json:"available"`
 	ImageURL    string  `json:"image_url"`
-	OwnerID     uint    `json:"owner_id" binding:"required"`
+	// ❌ ELIMINAR: OwnerID     uint    `json:"owner_id" binding:"required"`
 }
 
-// UpdateCanchaRequest - DTO para actualizar una cancha
+// UpdateCanchaRequest - DTO para actualizar una cancha (SOLO ADMIN)
 type UpdateCanchaRequest struct {
 	Name        string  `json:"name" binding:"omitempty,min=3"`
 	Type        string  `json:"type" binding:"omitempty,oneof=futbol tenis basquet paddle voley"`
@@ -33,19 +33,19 @@ type UpdateCanchaRequest struct {
 
 // CanchaResponse - DTO para respuesta de cancha
 type CanchaResponse struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Type        string    `json:"type"`
-	Description string    `json:"description"`
-	Location    string    `json:"location"`
-	Address     string    `json:"address"`
-	Price       float64   `json:"price"`
-	Capacity    int       `json:"capacity"`
-	Available   bool      `json:"available"`
-	ImageURL    string    `json:"image_url"`
-	OwnerID     uint      `json:"owner_id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Type        string  `json:"type"`
+	Description string  `json:"description"`
+	Location    string  `json:"location"`
+	Address     string  `json:"address"`
+	Price       float64 `json:"price"`
+	Capacity    int     `json:"capacity"`
+	Available   bool    `json:"available"`
+	ImageURL    string  `json:"image_url"`
+	// ❌ ELIMINAR: OwnerID     uint      `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // CanchasListResponse - DTO para lista de canchas
