@@ -31,7 +31,9 @@ func (ctrl *ReservaController) Create(c *gin.Context) {
 		return
 	}
 
-	reserva, err := ctrl.service.Create(&req)
+	token := c.GetHeader("Authorization")
+	reserva, err := ctrl.service.Create(&req, token)
+
 	if err != nil {
 		statusCode := http.StatusInternalServerError
 		if err.Error() == "user validation failed" ||

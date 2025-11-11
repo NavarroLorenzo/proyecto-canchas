@@ -10,7 +10,7 @@ import (
 )
 
 type UserClient interface {
-	ValidateUser(userID uint) (bool, *UserResponse, error)
+	ValidateUser(userID uint, token string) (bool, *UserResponse, error)
 }
 
 type userClient struct {
@@ -38,10 +38,20 @@ func NewUserClient() UserClient {
 }
 
 // ValidateUser verifica si un usuario existe y retorna sus datos
-func (c *userClient) ValidateUser(userID uint) (bool, *UserResponse, error) {
+func (c *userClient) ValidateUser(userID uint, token string) (bool, *UserResponse, error) {
 	url := fmt.Sprintf("%s/users/%d", c.baseURL, userID)
 
-	resp, err := c.httpClient.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return false, nil, fmt.Errorf("error creating request: %w", err)
+	}
+
+	// 🟢 Agregar el header Authorization con el token Bearer
+	if token != "" {
+		req.Header.Add("Authorization", token)
+	}
+
+	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return false, nil, fmt.Errorf("error calling users-api: %w", err)
 	}
@@ -49,6 +59,10 @@ func (c *userClient) ValidateUser(userID uint) (bool, *UserResponse, error) {
 
 	if resp.StatusCode == http.StatusNotFound {
 		return false, nil, errors.New("user not found")
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized {
+		return false, nil, errors.New("unauthorized: invalid or missing token")
 	}
 
 	if resp.StatusCode != http.StatusOK {

@@ -13,7 +13,7 @@ import (
 )
 
 type ReservaService interface {
-	Create(req *dto.CreateReservaRequest) (*dto.ReservaResponse, error)
+	Create(req *dto.CreateReservaRequest, token string) (*dto.ReservaResponse, error)
 	GetByID(id string) (*dto.ReservaResponse, error)
 	GetAll() (*dto.ReservasListResponse, error)
 	GetByUserID(userID uint) (*dto.ReservasListResponse, error)
@@ -45,7 +45,7 @@ func NewReservaService(
 }
 
 // Create crea una nueva reserva con validación concurrente
-func (s *reservaService) Create(req *dto.CreateReservaRequest) (*dto.ReservaResponse, error) {
+func (s *reservaService) Create(req *dto.CreateReservaRequest, token string) (*dto.ReservaResponse, error) {
 	// Variables para almacenar resultados de las validaciones
 	var userData *clients.UserResponse
 	var canchaData *clients.CanchaResponse
@@ -59,7 +59,7 @@ func (s *reservaService) Create(req *dto.CreateReservaRequest) (*dto.ReservaResp
 		{
 			Name: "user_validation",
 			Function: func() dto.ValidationResult {
-				valid, user, err := s.userClient.ValidateUser(req.UserID)
+				valid, user, err := s.userClient.ValidateUser(req.UserID, token)
 				if err != nil || !valid {
 					return dto.ValidationResult{
 						Valid:   false,
