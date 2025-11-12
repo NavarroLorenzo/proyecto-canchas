@@ -15,7 +15,6 @@ type CreateCanchaRequest struct {
 	Capacity    int     `json:"capacity" binding:"required,gt=0"`
 	Available   bool    `json:"available"`
 	ImageURL    string  `json:"image_url"`
-	// ❌ ELIMINAR: OwnerID     uint    `json:"owner_id" binding:"required"`
 }
 
 // UpdateCanchaRequest - DTO para actualizar una cancha (SOLO ADMIN)

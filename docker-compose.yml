@@ -198,6 +198,27 @@ services:
     networks:
       - app-network
 
+      # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:8083
+      - VITE_USERS_API_URL=http://localhost:8080
+      - VITE_CANCHAS_API_URL=http://localhost:8081
+      - VITE_RESERVAS_API_URL=http://localhost:8082
+    depends_on:
+      - search-api
+      - users-api
+      - canchas-api
+      - reservas-api
+    networks:
+      - app-network
+
 volumes:
   mysql_data:
   mongodb_data:
