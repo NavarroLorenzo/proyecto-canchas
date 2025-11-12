@@ -1,0 +1,72 @@
+package main
+
+import (
+	"log"
+	"os"
+	"strconv"
+
+	"search-api/config"
+	"search-api/internal/consumers"
+	"search-api/internal/controllers"
+	"search-api/internal/services"
+
+	"github.com/gin-gonic/gin"
+)
+
+func main() {
+	// 1️⃣ Cargar configuración desde .env
+	config.LoadConfig()
+
+	// 2️⃣ Inicializar servicio y controlador
+	searchService := services.NewSearchService()
+	searchController := controllers.NewSearchController(searchService)
+
+	// 3️⃣ Iniciar consumer de RabbitMQ en segundo plano
+	go func() {
+		consumer, err := consumers.NewRabbitConsumer(os.Getenv("RABBITMQ_URL"), searchService)
+		if err != nil {
+			log.Fatalf("[RabbitMQ] Connection error: %v", err)
+		}
+
+		err = consumer.Listen(os.Getenv("RABBITMQ_EXCHANGE"), "search_queue")
+		if err != nil {
+			log.Fatalf("[RabbitMQ] Listen error: %v", err)
+		}
+	}()
+
+	// 4️⃣ Iniciar servidor HTTP
+	router := gin.Default()
+
+	// Endpoint principal /search
+	router.GET("/search", func(c *gin.Context) {
+		q := c.Query("q")
+		page := c.DefaultQuery("page", "1")
+		pageSize := c.DefaultQuery("page_size", "10")
+
+		pageInt, _ := strconv.Atoi(page)
+		pageSizeInt, _ := strconv.Atoi(pageSize)
+
+		results, err := searchService.Search(q, pageInt, pageSizeInt)
+		if err != nil {
+			c.JSON(500, gin.H{
+				"error":   "Search failed",
+				"message": err.Error(),
+			})
+			return
+		}
+
+		c.JSON(200, results)
+	})
+
+	// También podés montar el controller completo
+	router.GET("/search2", searchController.Search)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8083"
+	}
+	log.Printf("[HTTP] Search API running on port %s", port)
+	if err := router.Run(":" + port); err != nil {
+		log.Fatalf("Server error: %v", err)
+	}
+}

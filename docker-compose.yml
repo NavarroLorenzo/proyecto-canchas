@@ -1,5 +1,6 @@
+
 services:
-  # MySQL Database (para users-api)
+  # 🗄️ MySQL Database (para users-api)
   mysql:
     image: mysql:8.0
     container_name: users_mysql
@@ -18,7 +19,7 @@ services:
     networks:
       - app-network
 
-  # MongoDB (para canchas-api y reservas-api)
+  # 🍃 MongoDB (para canchas-api y reservas-api)
   mongodb:
     image: mongo:7.0
     container_name: mongodb
@@ -34,13 +35,13 @@ services:
     networks:
       - app-network
 
-  # RabbitMQ (para mensajería entre microservicios)
+  # 🐇 RabbitMQ (mensajería entre microservicios)
   rabbitmq:
     image: rabbitmq:3.12-management-alpine
     container_name: rabbitmq
     ports:
       - "5672:5672"   # Puerto AMQP
-      - "15672:15672" # Puerto Management UI
+      - "15672:15672" # UI web de RabbitMQ
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
@@ -54,7 +55,7 @@ services:
     networks:
       - app-network
 
-  # Users API
+  # 👤 Users API
   users-api:
     build:
       context: ./users-api
@@ -79,7 +80,7 @@ services:
       - app-network
     restart: unless-stopped
 
-  # Canchas API
+  # 🏟️ Canchas API
   canchas-api:
     build:
       context: ./canchas-api
@@ -106,7 +107,8 @@ services:
     networks:
       - app-network
     restart: unless-stopped
-# Reservas API
+
+  # 📅 Reservas API
   reservas-api:
     build:
       context: ./reservas-api
@@ -137,13 +139,71 @@ services:
       - app-network
     restart: unless-stopped
 
+  # 🔍 Search API
+  search-api:
+    build:
+      context: ./search-api
+      dockerfile: Dockerfile
+    container_name: search_api
+    ports:
+      - "8083:8083"
+    environment:
+      - PORT=8083
+      - GIN_MODE=debug
+      - SOLR_URL=http://solr:8983/solr
+      - SOLR_CORE=canchas
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=canchas_events
+      - RABBITMQ_QUEUE=canchas_queue
+      - MEMCACHED_URL=memcached:11211
+      - LOCAL_CACHE_SIZE=1000
+      - LOCAL_CACHE_TTL_MINUTES=5
+      - MEMCACHED_TTL_MINUTES=10
+      - CANCHAS_API_URL=http://canchas-api:8081
+    depends_on:
+      solr:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+      memcached:
+        condition: service_started
+      canchas-api:
+        condition: service_started
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  # 🧠 Memcached (cache distribuida)
+  memcached:
+    image: memcached:1.6-alpine
+    container_name: memcached
+    ports:
+      - "11211:11211"
+    networks:
+      - app-network
+
+  # 🔎 Solr (motor de búsqueda)
+  solr:
+    image: solr:9
+    container_name: solr
+    ports:
+      - "8983:8983"
+    volumes:
+      - ./search-api/solr-config:/myconfig
+      - solr_data:/var/solr
+    command:
+      - solr-precreate
+      - canchas
+      - /myconfig
+    networks:
+      - app-network
+
 volumes:
   mysql_data:
   mongodb_data:
   rabbitmq_data:
+  solr_data:
 
 networks:
   app-network:
     driver: bridge
-
-    
