@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <style> .s{fill:#000}</style>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#fff" stroke="#000" stroke-width="2"/>
+  <!-- central pentagon -->
+  <polygon class="s" points="32,18 38,26 34,36 30,36 26,26"/>
+  <!-- surrounding panels (stylized) -->
+  <polygon class="s" points="20,24 24,34 18,38 12,30"/>
+  <polygon class="s" points="44,24 52,30 46,38 40,34"/>
+  <polygon class="s" points="24,44 30,36 34,36 40,44 32,50"/>
+  <polygon class="s" points="10,22 18,18 24,24 12,30"/>
+  <!-- simple seams -->
+  <path d="M32 2 L32 62" stroke="#000" stroke-width="1" opacity="0.05"/>
+  <path d="M2 32 L62 32" stroke="#000" stroke-width="1" opacity="0.05"/>
+</svg>

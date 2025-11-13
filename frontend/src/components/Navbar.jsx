@@ -14,7 +14,7 @@ const Navbar = () => {
     <nav style={styles.nav}>
       <div style={styles.container}>
         <Link to="/" style={styles.logo}>
-          🏟️ Canchas Deportivas
+          Canchas Deportivas
         </Link>
 
         <div style={styles.menu}>
