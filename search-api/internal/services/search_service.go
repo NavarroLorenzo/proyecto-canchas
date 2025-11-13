@@ -32,9 +32,27 @@ func NewSearchService() SearchService {
 
 // ✅ Indexa una cancha en Solr (cuando llega un evento desde RabbitMQ)
 func (s *searchService) IndexCancha(data interface{}) error {
-	jsonData, err := json.Marshal(data)
+	// Los documentos deben mandarse dentro del comando "add" para que Solr los acepte.
+	doc, ok := data.(map[string]interface{})
+	if !ok {
+		raw, err := json.Marshal(data)
+		if err != nil {
+			return fmt.Errorf("failed to marshal cancha data: %v", err)
+		}
+		if err := json.Unmarshal(raw, &doc); err != nil {
+			return fmt.Errorf("failed to normalize cancha data: %v", err)
+		}
+	}
+
+	payload := map[string]interface{}{
+		"add": map[string]interface{}{
+			"doc": doc,
+		},
+	}
+
+	jsonData, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("failed to marshal cancha data: %v", err)
+		return fmt.Errorf("failed to marshal Solr payload: %v", err)
 	}
 
 	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
@@ -49,7 +67,7 @@ func (s *searchService) IndexCancha(data interface{}) error {
 		return fmt.Errorf("Solr returned %d: %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Println("[Solr] Cancha indexada correctamente en Solr ✅")
+	fmt.Println("[Solr] Cancha indexada correctamente en Solr.")
 	return nil
 }
 
