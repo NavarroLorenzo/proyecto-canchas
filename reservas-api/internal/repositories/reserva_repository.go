@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"reservas-api/internal/domain"
+	"reservas-api/internal/utils"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -196,35 +197,55 @@ func (r *reservaRepository) CheckAvailability(canchaID string, date time.Time, s
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// Buscar reservas de la misma cancha en la misma fecha que NO estén canceladas
 	filter := bson.M{
 		"cancha_id": canchaID,
 		"date":      date,
 		"status":    bson.M{"$ne": "cancelled"},
-		"$or": []bson.M{
-			// Caso 1: La nueva reserva empieza durante una reserva existente
-			{
-				"start_time": bson.M{"$lte": startTime},
-				"end_time":   bson.M{"$gt": startTime},
-			},
-			// Caso 2: La nueva reserva termina durante una reserva existente
-			{
-				"start_time": bson.M{"$lt": endTime},
-				"end_time":   bson.M{"$gte": endTime},
-			},
-			// Caso 3: La nueva reserva contiene completamente una reserva existente
-			{
-				"start_time": bson.M{"$gte": startTime},
-				"end_time":   bson.M{"$lte": endTime},
-			},
-		},
 	}
 
-	count, err := r.collection.CountDocuments(ctx, filter)
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return false, err
+	}
+	defer cursor.Close(ctx)
+
+	requestedStart, err := utils.NormalizeSlotMinutes(startTime)
+	if err != nil {
+		return false, err
+	}
+	requestedEnd, err := utils.NormalizeSlotMinutes(endTime)
 	if err != nil {
 		return false, err
 	}
 
-	// Si count > 0, significa que hay conflicto (no está disponible)
-	return count == 0, nil
+	for cursor.Next(ctx) {
+		var existing domain.Reserva
+		if err := cursor.Decode(&existing); err != nil {
+			return false, err
+		}
+
+		existingStart, err := utils.NormalizeSlotMinutes(existing.StartTime)
+		if err != nil {
+			return false, err
+		}
+
+		existingEnd := existingStart + existing.Duration
+		if existing.Duration == 0 {
+			normalizedEnd, err := utils.NormalizeSlotMinutes(existing.EndTime)
+			if err != nil {
+				return false, err
+			}
+			existingEnd = normalizedEnd
+		}
+
+		if utils.IntervalsOverlap(requestedStart, requestedEnd, existingStart, existingEnd) {
+			return false, nil
+		}
+	}
+
+	if err := cursor.Err(); err != nil {
+		return false, err
+	}
+
+	return true, nil
 }

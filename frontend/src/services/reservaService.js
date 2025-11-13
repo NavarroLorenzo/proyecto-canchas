@@ -33,6 +33,12 @@ const reservaService = {
     return response.data;
   },
 
+  // Obtener reservas por cancha
+  getReservasByCanchaId: async (canchaId) => {
+    const response = await axios.get(`${API_URL}/reservas/cancha/${canchaId}`);
+    return response.data;
+  },
+
   // Obtener reserva por ID
   getReservaById: async (id, token) => {
     const response = await axios.get(`${API_URL}/reservas/${id}`, {

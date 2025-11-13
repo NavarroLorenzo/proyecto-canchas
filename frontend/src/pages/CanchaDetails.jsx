@@ -1,8 +1,55 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import canchaService from '../services/canchaService';
 import reservaService from '../services/reservaService';
+
+const PADDEL_TYPES = ['padel', 'tenis', 'paddle'];
+const START_MINUTES = 10 * 60;
+const END_MINUTES = 26 * 60;
+const MINUTES_IN_DAY = 24 * 60;
+
+const isExtendedSlot = (type = '') =>
+  PADDEL_TYPES.includes(type.toLowerCase());
+
+const minutesToLabel = (minutes) => {
+  const normalized = ((minutes % MINUTES_IN_DAY) + MINUTES_IN_DAY) % MINUTES_IN_DAY;
+  const hours = Math.floor(normalized / 60);
+  const mins = normalized % 60;
+  return `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+};
+
+const parseTimeToMinutes = (timeStr) => {
+  if (!timeStr) return 0;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const normalizeMinutesForRange = (timeStr) => {
+  let minutes = parseTimeToMinutes(timeStr);
+  if (minutes < START_MINUTES) {
+    minutes += MINUTES_IN_DAY;
+  }
+  return minutes;
+};
+
+const generateSlots = (type = '') => {
+  const duration = isExtendedSlot(type) ? 90 : 60;
+  const slots = [];
+  for (let current = START_MINUTES; current + duration <= END_MINUTES; current += duration) {
+    const start = minutesToLabel(current);
+    const end = minutesToLabel(current + duration);
+    slots.push({
+      key: `${start}-${end}`,
+      start,
+      end,
+      duration,
+      normalizedStart: current,
+      normalizedEnd: current + duration,
+    });
+  }
+  return slots;
+};
 
 const CanchaDetails = () => {
   const { id } = useParams();
@@ -21,6 +68,9 @@ const CanchaDetails = () => {
   });
   const [reservaLoading, setReservaLoading] = useState(false);
   const [reservaError, setReservaError] = useState('');
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState('');
 
   useEffect(() => {
     fetchCancha();
@@ -37,11 +87,89 @@ const CanchaDetails = () => {
     }
   };
 
+  const slotOptions = useMemo(() => {
+    if (!cancha) return [];
+    return generateSlots(cancha.type || '');
+  }, [cancha]);
+
+  const slotsWithStatus = useMemo(
+    () =>
+      slotOptions.map((slot) => {
+        const isBooked = bookedSlots.some(
+          (booked) => booked.normalizedStart === slot.normalizedStart
+        );
+        const isSelected =
+          reservaData.start_time === slot.start &&
+          reservaData.end_time === slot.end;
+        return { ...slot, isBooked, isSelected };
+      }),
+    [slotOptions, bookedSlots, reservaData.start_time, reservaData.end_time]
+  );
+
+  useEffect(() => {
+    if (!reservaData.date || !id) {
+      setBookedSlots([]);
+      setSlotsError('');
+      return;
+    }
+
+    const loadBookedSlots = async () => {
+      setSlotsLoading(true);
+      setSlotsError('');
+      try {
+        const data = await reservaService.getReservasByCanchaId(id);
+        const reservas = data?.reservas || [];
+        const sameDay = reservas.filter(
+          (item) => item.date === reservaData.date && item.status !== 'cancelled'
+        );
+        const normalized = sameDay.map((item) => {
+          const normalizedStart = normalizeMinutesForRange(item.start_time);
+          const normalizedEnd = normalizeMinutesForRange(item.end_time);
+          return {
+            start: item.start_time,
+            end: item.end_time,
+            normalizedStart,
+            normalizedEnd:
+              normalizedEnd <= normalizedStart
+                ? normalizedEnd + MINUTES_IN_DAY
+                : normalizedEnd,
+          };
+        });
+        setBookedSlots(normalized);
+      } catch (err) {
+        console.error('Error fetching booked slots:', err);
+        setBookedSlots([]);
+        setSlotsError('No se pudieron cargar los turnos. Intenta nuevamente.');
+      } finally {
+        setSlotsLoading(false);
+      }
+    };
+
+    loadBookedSlots();
+  }, [id, reservaData.date]);
+
   const handleReservaChange = (e) => {
-    setReservaData({
-      ...reservaData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+    setReservaData((prev) => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'date'
+        ? {
+            start_time: '',
+            end_time: '',
+          }
+        : {}),
+    }));
+  };
+
+  const handleSelectSlot = (slot) => {
+    if (slot.isBooked) return;
+    setReservaError('');
+    setReservaData((prev) => ({
+      ...prev,
+      start_time: slot.start,
+      end_time: slot.end,
+    }));
   };
 
   const handleReservar = async (e) => {
@@ -49,6 +177,11 @@ const CanchaDetails = () => {
 
     if (!isAuthenticated) {
       navigate('/login', { state: { from: `/cancha/${id}` } });
+      return;
+    }
+
+    if (!reservaData.date || !reservaData.start_time || !reservaData.end_time) {
+      setReservaError('Selecciona una fecha y un horario disponible.');
       return;
     }
 
@@ -84,10 +217,12 @@ const CanchaDetails = () => {
 
   const calculateDuration = () => {
     if (reservaData.start_time && reservaData.end_time) {
-      const start = new Date(`2000-01-01T${reservaData.start_time}`);
-      const end = new Date(`2000-01-01T${reservaData.end_time}`);
-      const diff = (end - start) / (1000 * 60); // minutos
-      return diff > 0 ? diff : 0;
+      const start = normalizeMinutesForRange(reservaData.start_time);
+      let end = normalizeMinutesForRange(reservaData.end_time);
+      if (end <= start) {
+        end += MINUTES_IN_DAY;
+      }
+      return end - start;
     }
     return 0;
   };
@@ -100,6 +235,10 @@ const CanchaDetails = () => {
     }
     return 0;
   };
+
+  const isFormReady = Boolean(
+    reservaData.date && reservaData.start_time && reservaData.end_time
+  );
 
   if (loading) {
     return <div style={styles.loading}>Cargando...</div>;
@@ -207,33 +346,84 @@ const CanchaDetails = () => {
               </div>
 
               <div style={styles.formGroup}>
-                <label style={styles.label}>Hora de inicio</label>
-                <input
-                  type="time"
-                  name="start_time"
-                  value={reservaData.start_time}
-                  onChange={handleReservaChange}
-                  required
-                  style={styles.input}
-                  disabled={!cancha.available}
-                />
+                <label style={styles.label}>Turnos disponibles</label>
+                {!reservaData.date ? (
+                  <div style={styles.slotInfo}>
+                    Selecciona una fecha para ver los horarios disponibles.
+                  </div>
+                ) : slotsLoading ? (
+                  <div style={styles.slotInfo}>Cargando turnos...</div>
+                ) : (
+                  <>
+                    {slotsError && (
+                      <div style={styles.slotError}>{slotsError}</div>
+                    )}
+
+                    <div style={styles.slotLegend}>
+                      <span style={styles.legendItem}>
+                        <span
+                          style={{
+                            ...styles.legendDot,
+                            backgroundColor: '#27ae60',
+                          }}
+                        ></span>
+                        Disponible
+                      </span>
+                      <span style={styles.legendItem}>
+                        <span
+                          style={{
+                            ...styles.legendDot,
+                            backgroundColor: '#bdc3c7',
+                          }}
+                        ></span>
+                        Ocupado
+                      </span>
+                      <span style={styles.legendItem}>
+                        <span
+                          style={{
+                            ...styles.legendDot,
+                            backgroundColor: '#2980b9',
+                          }}
+                        ></span>
+                        Seleccionado
+                      </span>
+                    </div>
+
+                    {slotsWithStatus.length === 0 ? (
+                      <div style={styles.slotInfo}>
+                        No hay turnos configurados para esta cancha.
+                      </div>
+                    ) : (
+                      <div style={styles.slotGrid}>
+                        {slotsWithStatus.map((slot) => (
+                          <button
+                            key={slot.key}
+                            type="button"
+                            onClick={() => handleSelectSlot(slot)}
+                            disabled={slot.isBooked || !cancha.available}
+                            style={{
+                              ...styles.slotButton,
+                              ...(slot.isBooked ? styles.slotButtonBooked : {}),
+                              ...(slot.isSelected ? styles.slotButtonSelected : {}),
+                            }}
+                          >
+                            {slot.start} - {slot.end}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Hora de fin</label>
-                <input
-                  type="time"
-                  name="end_time"
-                  value={reservaData.end_time}
-                  onChange={handleReservaChange}
-                  required
-                  style={styles.input}
-                  disabled={!cancha.available}
-                />
-              </div>
-
-              {calculateDuration() > 0 && (
+              {isFormReady && (
                 <div style={styles.summary}>
+                  <div style={styles.summaryRow}>
+                    <span>Horario seleccionado:</span>
+                    <span>
+                      {reservaData.start_time} - {reservaData.end_time}
+                    </span>
+                  </div>
                   <div style={styles.summaryRow}>
                     <span>Duración:</span>
                     <span>{calculateDuration()} minutos</span>
@@ -251,10 +441,20 @@ const CanchaDetails = () => {
 
               <button
                 type="submit"
-                disabled={reservaLoading || !cancha.available || !isAuthenticated}
+                disabled={
+                  reservaLoading ||
+                  !cancha.available ||
+                  !isAuthenticated ||
+                  !isFormReady
+                }
                 style={{
                   ...styles.submitBtn,
-                  ...(reservaLoading || !cancha.available || !isAuthenticated ? styles.submitBtnDisabled : {})
+                  ...(reservaLoading ||
+                  !cancha.available ||
+                  !isAuthenticated ||
+                  !isFormReady
+                    ? styles.submitBtnDisabled
+                    : {}),
                 }}
               >
                 {reservaLoading ? 'Reservando...' : 'Confirmar Reserva'}
@@ -459,6 +659,66 @@ const styles = {
     marginTop: '0.5rem',
     fontWeight: 'bold',
     fontSize: '1.1rem',
+  },
+  slotLegend: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '1rem',
+    fontSize: '0.85rem',
+    color: '#7f8c8d',
+    marginBottom: '0.75rem',
+  },
+  legendItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.4rem',
+  },
+  legendDot: {
+    width: '12px',
+    height: '12px',
+    borderRadius: '50%',
+    display: 'inline-block',
+  },
+  slotGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gap: '0.5rem',
+  },
+  slotButton: {
+    border: '1px solid #dfe6e9',
+    borderRadius: '6px',
+    padding: '0.5rem 0.25rem',
+    backgroundColor: '#fff',
+    cursor: 'pointer',
+    fontWeight: '500',
+    color: '#2c3e50',
+    transition: 'all 0.2s',
+  },
+  slotButtonSelected: {
+    backgroundColor: '#2980b9',
+    color: '#fff',
+    borderColor: '#2980b9',
+  },
+  slotButtonBooked: {
+    backgroundColor: '#ecf0f1',
+    color: '#95a5a6',
+    borderColor: '#ecf0f1',
+    cursor: 'not-allowed',
+  },
+  slotInfo: {
+    backgroundColor: '#f8f9fa',
+    padding: '0.75rem',
+    borderRadius: '4px',
+    fontSize: '0.9rem',
+    color: '#7f8c8d',
+  },
+  slotError: {
+    backgroundColor: '#fee',
+    color: '#c0392b',
+    padding: '0.5rem',
+    borderRadius: '4px',
+    marginBottom: '0.5rem',
+    fontSize: '0.9rem',
   },
   submitBtn: {
     backgroundColor: '#27ae60',

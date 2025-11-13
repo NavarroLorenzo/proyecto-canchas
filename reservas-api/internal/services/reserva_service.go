@@ -49,9 +49,9 @@ func (s *reservaService) Create(req *dto.CreateReservaRequest, token string) (*d
 	// Variables para almacenar resultados de las validaciones
 	var userData *clients.UserResponse
 	var canchaData *clients.CanchaResponse
-	var duration int
 	var totalPrice float64
 	var date time.Time
+	var duration int
 
 	// 🚀 CÁLCULO CONCURRENTE: Preparar validaciones
 	validations := []utils.ConcurrentValidation{
@@ -85,22 +85,7 @@ func (s *reservaService) Create(req *dto.CreateReservaRequest, token string) (*d
 				return dto.ValidationResult{Valid: true, Data: cancha}
 			},
 		},
-		// Validación 3: Calcular duración
-		{
-			Name: "duration_calculation",
-			Function: func() dto.ValidationResult {
-				dur, err := utils.CalculateDuration(req.StartTime, req.EndTime)
-				if err != nil {
-					return dto.ValidationResult{
-						Valid:   false,
-						Message: fmt.Sprintf("duration calculation failed: %v", err),
-					}
-				}
-				duration = dur
-				return dto.ValidationResult{Valid: true, Data: dur}
-			},
-		},
-		// Validación 4: Parsear fecha
+		// Validación 3: Parsear fecha
 		{
 			Name: "date_parsing",
 			Function: func() dto.ValidationResult {
@@ -130,6 +115,14 @@ func (s *reservaService) Create(req *dto.CreateReservaRequest, token string) (*d
 	if !allValid {
 		return nil, errors.New(fmt.Sprintf("validation failed: %v", validationErrors))
 	}
+
+	startTime, endTime, slotDuration, err := utils.EnsureValidSlot(canchaData.Type, req.StartTime, req.EndTime)
+	if err != nil {
+		return nil, err
+	}
+	req.StartTime = startTime
+	req.EndTime = endTime
+	duration = slotDuration
 
 	// Calcular precio (después de que todas las validaciones pasaron)
 	totalPrice = utils.CalculatePrice(canchaData.Price, duration)
@@ -276,17 +269,19 @@ func (s *reservaService) Update(id string, req *dto.UpdateReservaRequest) (*dto.
 
 	// Recalcular duración y precio si cambiaron las horas
 	if req.StartTime != "" || req.EndTime != "" {
-		duration, err := utils.CalculateDuration(existing.StartTime, existing.EndTime)
-		if err != nil {
-			return nil, err
-		}
-		existing.Duration = duration
-
-		// Obtener precio de la cancha
 		_, cancha, err := s.canchaClient.ValidateCancha(existing.CanchaID)
 		if err != nil {
 			return nil, err
 		}
+
+		startTime, endTime, duration, err := utils.EnsureValidSlot(cancha.Type, existing.StartTime, existing.EndTime)
+		if err != nil {
+			return nil, err
+		}
+
+		existing.StartTime = startTime
+		existing.EndTime = endTime
+		existing.Duration = duration
 		existing.TotalPrice = utils.CalculatePrice(cancha.Price, duration)
 	}
 
