@@ -461,7 +461,7 @@
   <field name="image_url" type="text_general"/>
   <field name="location" type="text_general"/>
   <field name="name" type="text_general"/>
-  <field name="name_sort" type="string" stored="false" multiValued="false"/>
+  <field name="name_sort" type="string" stored="false" indexed="true" docValues="true" multiValued="false"/>
   <field name="price" type="plongs"/>
   <field name="type" type="text_general"/>
   <field name="updated_at" type="pdates"/>
@@ -537,7 +537,6 @@
   <copyField source="address" dest="address_str" maxChars="256"/>
   <copyField source="image_url" dest="image_url_str" maxChars="256"/>
   <copyField source="name" dest="name_str" maxChars="256"/>
-  <copyField source="name" dest="name_sort" maxChars="256"/>
   <copyField source="description" dest="description_str" maxChars="256"/>
   <copyField source="location" dest="location_str" maxChars="256"/>
   <copyField source="type" dest="type_str" maxChars="256"/>

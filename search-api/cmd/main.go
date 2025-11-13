@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"search-api/config"
+	"search-api/internal/cache"
 	"search-api/internal/consumers"
 	"search-api/internal/controllers"
 	"search-api/internal/services"
@@ -15,7 +16,8 @@ import (
 func main() {
 	config.LoadConfig()
 
-	searchService := services.NewSearchService()
+	cacheManager := cache.NewCacheManager(config.AppConfig)
+	searchService := services.NewSearchService(cacheManager)
 	searchController := controllers.NewSearchController(searchService)
 
 	go func() {
