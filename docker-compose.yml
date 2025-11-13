@@ -97,6 +97,7 @@ services:
       - RABBITMQ_EXCHANGE=canchas_events
       - RABBITMQ_QUEUE=canchas_queue
       - USERS_API_URL=http://users-api:8080
+      - RESERVAS_API_URL=http://reservas-api:8082
     depends_on:
       mongodb:
         condition: service_healthy

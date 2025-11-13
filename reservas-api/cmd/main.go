@@ -108,6 +108,7 @@ func setupRouter(reservaController *controllers.ReservaController) *gin.Engine {
 		reservas.DELETE("/:id", reservaController.Cancel)
 		reservas.GET("/user/:user_id", reservaController.GetByUserID)
 		reservas.GET("/cancha/:cancha_id", reservaController.GetByCanchaID)
+		reservas.DELETE("/cancha/:cancha_id", reservaController.DeleteByCanchaID)
 	}
 
 	log.Println("Routes configured successfully")

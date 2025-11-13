@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+
+	"search-api/internal/dto"
 )
 
 type SearchService interface {
-	// Indexa una cancha en Solr (usado por el consumer RabbitMQ)
 	IndexCancha(data interface{}) error
-
-	// Ejecuta una búsqueda en Solr (usado por el endpoint /search)
-	Search(q string, page, pageSize int) (map[string]interface{}, error)
+	Search(q string, page, pageSize int, sort string) (*dto.SearchResponse, error)
 }
 
 type searchService struct {
@@ -23,7 +23,6 @@ type searchService struct {
 	coreName string
 }
 
-// Constructor del servicio
 func NewSearchService() SearchService {
 	return &searchService{
 		solrURL:  os.Getenv("SOLR_URL"),
@@ -31,9 +30,7 @@ func NewSearchService() SearchService {
 	}
 }
 
-// ✅ Indexa una cancha en Solr (cuando llega un evento desde RabbitMQ)
 func (s *searchService) IndexCancha(data interface{}) error {
-	// Los documentos deben mandarse dentro del comando "add" para que Solr los acepte.
 	doc, ok := data.(map[string]interface{})
 	if !ok {
 		raw, err := json.Marshal(data)
@@ -72,8 +69,7 @@ func (s *searchService) IndexCancha(data interface{}) error {
 	return nil
 }
 
-// ✅ Permite buscar canchas en Solr desde el endpoint /search
-func (s *searchService) Search(q string, page, pageSize int) (map[string]interface{}, error) {
+func (s *searchService) Search(q string, page, pageSize int, sort string) (*dto.SearchResponse, error) {
 	if page < 1 {
 		page = 1
 	}
@@ -82,12 +78,20 @@ func (s *searchService) Search(q string, page, pageSize int) (map[string]interfa
 	}
 
 	start := (page - 1) * pageSize
-	// Asegurarnos de URL-encodear la query para manejar espacios y caracteres especiales
-	encodedQ := url.QueryEscape(q)
-	url := fmt.Sprintf("%s/%s/select?q=%s&start=%d&rows=%d&wt=json",
-		s.solrURL, s.coreName, encodedQ, start, pageSize)
+	params := url.Values{}
+	params.Set("q", q)
+	params.Set("start", fmt.Sprintf("%d", start))
+	params.Set("rows", fmt.Sprintf("%d", pageSize))
+	params.Set("wt", "json")
+	params.Set("defType", "edismax")
+	params.Set("qf", "name description location address number")
+	if sort != "" {
+		params.Set("sort", sort)
+	}
 
-	resp, err := http.Get(url)
+	endpoint := fmt.Sprintf("%s/%s/select?%s", s.solrURL, s.coreName, params.Encode())
+
+	resp, err := http.Get(endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query Solr: %v", err)
 	}
@@ -98,10 +102,28 @@ func (s *searchService) Search(q string, page, pageSize int) (map[string]interfa
 		return nil, fmt.Errorf("Solr error %d: %s", resp.StatusCode, string(body))
 	}
 
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var solrResp struct {
+		Response struct {
+			NumFound int                      `json:"numFound"`
+			Start    int                      `json:"start"`
+			Docs     []map[string]interface{} `json:"docs"`
+		} `json:"response"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&solrResp); err != nil {
 		return nil, fmt.Errorf("failed to decode Solr response: %v", err)
 	}
 
-	return result, nil
+	totalPages := int(math.Ceil(float64(solrResp.Response.NumFound) / float64(pageSize)))
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	return &dto.SearchResponse{
+		Results:    solrResp.Response.Docs,
+		Total:      solrResp.Response.NumFound,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
 }

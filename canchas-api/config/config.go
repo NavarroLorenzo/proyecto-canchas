@@ -15,6 +15,7 @@ type Config struct {
 	RabbitMQExchange string
 	RabbitMQQueue    string
 	UsersAPIURL      string
+	ReservasAPIURL   string
 }
 
 var AppConfig *Config
@@ -34,6 +35,7 @@ func LoadConfig() {
 		RabbitMQExchange: getEnv("RABBITMQ_EXCHANGE", "canchas_events"),
 		RabbitMQQueue:    getEnv("RABBITMQ_QUEUE", "canchas_queue"),
 		UsersAPIURL:      getEnv("USERS_API_URL", "http://localhost:8080"),
+		ReservasAPIURL:   getEnv("RESERVAS_API_URL", "http://localhost:8082"),
 	}
 
 	log.Println("Configuration loaded successfully")

@@ -20,6 +20,7 @@ type ReservaService interface {
 	GetByCanchaID(canchaID string) (*dto.ReservasListResponse, error)
 	Update(id string, req *dto.UpdateReservaRequest) (*dto.ReservaResponse, error)
 	Cancel(id string) error
+	DeleteByCanchaID(canchaID string) (int64, error)
 }
 
 type reservaService struct {
@@ -344,6 +345,15 @@ func (s *reservaService) Cancel(id string) error {
 	}
 
 	return nil
+}
+
+// DeleteByCanchaID elimina todas las reservas asociadas a una cancha
+func (s *reservaService) DeleteByCanchaID(canchaID string) (int64, error) {
+	deleted, err := s.repo.DeleteByCanchaID(canchaID)
+	if err != nil {
+		return 0, err
+	}
+	return deleted, nil
 }
 
 // domainToResponse convierte una Reserva del dominio a ReservaResponse DTO

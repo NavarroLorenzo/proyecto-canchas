@@ -131,6 +131,26 @@ func (ctrl *ReservaController) GetByCanchaID(c *gin.Context) {
 	c.JSON(http.StatusOK, reservas)
 }
 
+// DeleteByCanchaID elimina todas las reservas de una cancha
+// DELETE /reservas/cancha/:cancha_id
+func (ctrl *ReservaController) DeleteByCanchaID(c *gin.Context) {
+	canchaID := c.Param("cancha_id")
+
+	deleted, err := ctrl.service.DeleteByCanchaID(canchaID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error:   "Failed to delete reservas",
+			Message: err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "reservas deleted successfully",
+		"deleted_count": deleted,
+	})
+}
+
 // Update actualiza una reserva existente
 // PUT /reservas/:id
 func (ctrl *ReservaController) Update(c *gin.Context) {

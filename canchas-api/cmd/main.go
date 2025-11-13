@@ -2,6 +2,7 @@ package main
 
 import (
 	"canchas-api/config"
+	"canchas-api/internal/clients"
 	"canchas-api/internal/controllers"
 	"canchas-api/internal/messaging"
 	"canchas-api/internal/repositories"
@@ -25,10 +26,10 @@ func main() {
 	}
 	defer publisher.Close()
 
-	// ❌ ELIMINAR: userClient := clients.NewUserClient()
+	reservaClient := clients.NewReservaClient()
 
 	canchaRepo := repositories.NewCanchaRepository(db)
-	canchaService := services.NewCanchaService(canchaRepo, publisher) // Sin userClient
+	canchaService := services.NewCanchaService(canchaRepo, publisher, reservaClient)
 	canchaController := controllers.NewCanchaController(canchaService)
 
 	router := setupRouter(canchaController)

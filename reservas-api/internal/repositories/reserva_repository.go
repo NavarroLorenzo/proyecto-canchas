@@ -18,6 +18,7 @@ type ReservaRepository interface {
 	GetAll() ([]domain.Reserva, error)
 	GetByUserID(userID uint) ([]domain.Reserva, error)
 	GetByCanchaID(canchaID string) ([]domain.Reserva, error)
+	DeleteByCanchaID(canchaID string) (int64, error)
 	Update(id string, reserva *domain.Reserva) error
 	Delete(id string) error
 	CheckAvailability(canchaID string, date time.Time, startTime, endTime string) (bool, error)
@@ -124,6 +125,18 @@ func (r *reservaRepository) GetByCanchaID(canchaID string) ([]domain.Reserva, er
 	}
 
 	return reservas, nil
+}
+
+// DeleteByCanchaID elimina todas las reservas asociadas a una cancha
+func (r *reservaRepository) DeleteByCanchaID(canchaID string) (int64, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	result, err := r.collection.DeleteMany(ctx, bson.M{"cancha_id": canchaID})
+	if err != nil {
+		return 0, err
+	}
+	return result.DeletedCount, nil
 }
 
 // Update actualiza una reserva existente

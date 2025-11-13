@@ -1,10 +1,12 @@
 package services
 
 import (
+	"canchas-api/internal/clients"
 	"canchas-api/internal/domain"
 	"canchas-api/internal/dto"
 	"canchas-api/internal/messaging"
 	"canchas-api/internal/repositories"
+	"log"
 	"time"
 )
 
@@ -17,18 +19,21 @@ type CanchaService interface {
 }
 
 type canchaService struct {
-	repo      repositories.CanchaRepository
-	publisher messaging.RabbitMQPublisher
+	repo          repositories.CanchaRepository
+	publisher     messaging.RabbitMQPublisher
+	reservaClient clients.ReservaClient
 }
 
 // NewCanchaService crea una nueva instancia del servicio
 func NewCanchaService(
 	repo repositories.CanchaRepository,
 	publisher messaging.RabbitMQPublisher,
+	reservaClient clients.ReservaClient,
 ) CanchaService {
 	return &canchaService{
-		repo:      repo,
-		publisher: publisher,
+		repo:          repo,
+		publisher:     publisher,
+		reservaClient: reservaClient,
 	}
 }
 
@@ -168,6 +173,12 @@ func (s *canchaService) Delete(id string) error {
 
 	if err := s.repo.Delete(id); err != nil {
 		return err
+	}
+
+	if s.reservaClient != nil {
+		if err := s.reservaClient.DeleteByCanchaID(id); err != nil {
+			log.Printf("Warning: failed to delete reservas for cancha %s: %v", id, err)
+		}
 	}
 
 	event := messaging.Event{

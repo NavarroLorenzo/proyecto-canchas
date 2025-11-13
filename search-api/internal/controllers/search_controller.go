@@ -67,7 +67,22 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 		finalQ = fmt.Sprintf("(%s) AND %s", baseQ, strings.Join(fqParts, " AND "))
 	}
 
-	resp, err := ctrl.service.Search(finalQ, req.Page, req.PageSize)
+	sortField := strings.ToLower(req.SortBy)
+	switch sortField {
+	case "price":
+		sortField = "price"
+	case "capacity":
+		sortField = "capacity"
+	default:
+		sortField = "name"
+	}
+	sortDir := strings.ToLower(req.SortOrder)
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+	sortParam := fmt.Sprintf("%s %s", sortField, sortDir)
+
+	resp, err := ctrl.service.Search(finalQ, req.Page, req.PageSize, sortParam)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "Search failed",
