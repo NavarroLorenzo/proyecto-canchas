@@ -12,6 +12,7 @@ type CanchaSearch struct {
 	Description string    `json:"description"`
 	Location    string    `json:"location"`
 	Address     string    `json:"address"`
+	Number      int       `json:"number"`
 	Price       float64   `json:"price"`
 	Capacity    int       `json:"capacity"`
 	Available   bool      `json:"available"`

@@ -459,6 +459,7 @@
   <field name="description" type="text_general" indexed="true" stored="true"/>
   <field name="location" type="text_general" indexed="true" stored="true"/>
   <field name="address" type="text_general" indexed="true" stored="true"/>
+  <field name="number" type="pint" indexed="true" stored="true"/>
   <field name="image_url" type="string" indexed="false" stored="true"/>
   <field name="price" type="pfloat" indexed="true" stored="true"/>
   <field name="capacity" type="pint" indexed="true" stored="true"/>

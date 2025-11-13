@@ -454,6 +454,7 @@
   <field name="address" type="text_general"/>
   <field name="available" type="booleans"/>
   <field name="capacity" type="plongs"/>
+  <field name="number" type="pint"/>
   <field name="created_at" type="pdates"/>
   <field name="description" type="text_general"/>
   <field name="id" type="string" multiValued="false" indexed="true" required="true" stored="true"/>

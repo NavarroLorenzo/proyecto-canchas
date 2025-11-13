@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 )
 
@@ -81,8 +82,10 @@ func (s *searchService) Search(q string, page, pageSize int) (map[string]interfa
 	}
 
 	start := (page - 1) * pageSize
+	// Asegurarnos de URL-encodear la query para manejar espacios y caracteres especiales
+	encodedQ := url.QueryEscape(q)
 	url := fmt.Sprintf("%s/%s/select?q=%s&start=%d&rows=%d&wt=json",
-		s.solrURL, s.coreName, q, start, pageSize)
+		s.solrURL, s.coreName, encodedQ, start, pageSize)
 
 	resp, err := http.Get(url)
 	if err != nil {

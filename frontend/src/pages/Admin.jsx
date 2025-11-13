@@ -10,7 +10,7 @@ const Admin = () => {
   // Estado para canchas
   const [canchas, setCanchas] = useState([]);
   const [canchasLoading, setCanchasLoading] = useState(true);
-  
+
   // Estado para reservas
   const [reservas, setReservas] = useState([]);
   const [reservasLoading, setReservasLoading] = useState(true);
@@ -22,8 +22,7 @@ const Admin = () => {
     name: '',
     type: 'futbol',
     description: '',
-    location: '',
-    address: '',
+    number: '',
     price: '',
     capacity: '',
     available: true,
@@ -64,8 +63,7 @@ const Admin = () => {
       name: '',
       type: 'futbol',
       description: '',
-      location: '',
-      address: '',
+      number: '',
       price: '',
       capacity: '',
       available: true,
@@ -80,8 +78,7 @@ const Admin = () => {
       name: cancha.name,
       type: cancha.type,
       description: cancha.description,
-      location: cancha.location,
-      address: cancha.address,
+      number: cancha.number || '',
       price: cancha.price.toString(),
       capacity: cancha.capacity.toString(),
       available: cancha.available,
@@ -105,6 +102,7 @@ const Admin = () => {
       ...canchaForm,
       price: parseFloat(canchaForm.price),
       capacity: parseInt(canchaForm.capacity),
+      number: parseInt(canchaForm.number),
     };
 
     try {
@@ -185,9 +183,9 @@ const Admin = () => {
               <table style={styles.tableElement}>
                 <thead>
                   <tr style={styles.tableHeader}>
+                    <th style={styles.th}>N°</th>
                     <th style={styles.th}>Nombre</th>
                     <th style={styles.th}>Tipo</th>
-                    <th style={styles.th}>Ubicación</th>
                     <th style={styles.th}>Precio</th>
                     <th style={styles.th}>Capacidad</th>
                     <th style={styles.th}>Estado</th>
@@ -197,11 +195,12 @@ const Admin = () => {
                 <tbody>
                   {canchas.map((cancha) => (
                     <tr key={cancha.id} style={styles.tableRow}>
+                      <td style={styles.td}>{cancha.number || '-'}</td>
                       <td style={styles.td}>{cancha.name}</td>
                       <td style={styles.td}>
                         <span style={styles.typeBadge}>{cancha.type}</span>
                       </td>
-                      <td style={styles.td}>{cancha.location}</td>
+
                       <td style={styles.td}>${cancha.price}</td>
                       <td style={styles.td}>{cancha.capacity}</td>
                       <td style={styles.td}>
@@ -351,25 +350,14 @@ const Admin = () => {
 
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Ubicación</label>
+                  <label style={styles.label}>N° Cancha</label>
                   <input
-                    type="text"
-                    name="location"
-                    value={canchaForm.location}
+                    type="number"
+                    name="number"
+                    value={canchaForm.number}
                     onChange={handleCanchaFormChange}
                     required
-                    style={styles.input}
-                  />
-                </div>
-
-                <div style={styles.formGroup}>
-                  <label style={styles.label}>Dirección</label>
-                  <input
-                    type="text"
-                    name="address"
-                    value={canchaForm.address}
-                    onChange={handleCanchaFormChange}
-                    required
+                    min="1"
                     style={styles.input}
                   />
                 </div>

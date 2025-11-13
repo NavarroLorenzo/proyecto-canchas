@@ -65,13 +65,13 @@ const CanchaDetails = () => {
       };
 
       const response = await reservaService.createReserva(payload, token);
-      
+
       // Redirigir a página de confirmación
-      navigate('/congrats', { 
-        state: { 
+      navigate('/congrats', {
+        state: {
           reserva: response,
-          cancha: cancha 
-        } 
+          cancha: cancha
+        }
       });
     } catch (err) {
       setReservaError(
@@ -155,15 +155,14 @@ const CanchaDetails = () => {
           <div style={styles.badges}>
             <span style={styles.badge}>{cancha.type}</span>
             <span style={styles.badge}>👥 {cancha.capacity} personas</span>
-            <span style={{...styles.badge, backgroundColor: cancha.available ? '#27ae60' : '#e74c3c'}}>
+            <span style={{ ...styles.badge, backgroundColor: cancha.available ? '#27ae60' : '#e74c3c' }}>
               {cancha.available ? '✓ Disponible' : '✗ No disponible'}
             </span>
           </div>
 
           <div style={styles.infoSection}>
-            <h3 style={styles.sectionTitle}>📍 Ubicación</h3>
-            <p style={styles.text}>{cancha.location}</p>
-            <p style={styles.text}>{cancha.address}</p>
+            <h3 style={styles.sectionTitle}>N° Cancha</h3>
+            <p style={styles.text}>#{cancha.number || cancha.id}</p>
           </div>
 
           <div style={styles.infoSection}>
@@ -243,7 +242,7 @@ const CanchaDetails = () => {
                     <span>Precio por hora:</span>
                     <span>${cancha.price}</span>
                   </div>
-                  <div style={{...styles.summaryRow, ...styles.summaryTotal}}>
+                  <div style={{ ...styles.summaryRow, ...styles.summaryTotal }}>
                     <span>Total:</span>
                     <span>${calculatePrice()}</span>
                   </div>

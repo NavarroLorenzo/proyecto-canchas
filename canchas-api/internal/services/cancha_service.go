@@ -43,11 +43,17 @@ func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaRespons
 		Description: req.Description,
 		Location:    req.Location,
 		Address:     req.Address,
+		Number:      req.Number,
 		Price:       req.Price,
 		Capacity:    req.Capacity,
 		Available:   req.Available,
 		ImageURL:    req.ImageURL,
 		// ❌ ELIMINAR: OwnerID:     req.OwnerID,
+	}
+
+	// Si no se pasó location desde el admin, asignar un valor por defecto (todas están en el mismo complejo)
+	if cancha.Location == "" {
+		cancha.Location = "Complejo Principal"
 	}
 
 	if err := s.repo.Create(cancha); err != nil {
@@ -119,6 +125,9 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 	if req.Address != "" {
 		existing.Address = req.Address
 	}
+	if req.Number > 0 {
+		existing.Number = req.Number
+	}
 	if req.Price > 0 {
 		existing.Price = req.Price
 	}
@@ -184,6 +193,7 @@ func (s *canchaService) domainToResponse(cancha *domain.Cancha) *dto.CanchaRespo
 		Description: cancha.Description,
 		Location:    cancha.Location,
 		Address:     cancha.Address,
+		Number:      cancha.Number,
 		Price:       cancha.Price,
 		Capacity:    cancha.Capacity,
 		Available:   cancha.Available,

@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"strconv"
 
 	"search-api/config"
 	"search-api/internal/consumers"
@@ -37,28 +36,10 @@ func main() {
 	// 4️⃣ Iniciar servidor HTTP
 	router := gin.Default()
 
-	// Endpoint principal /search
-	router.GET("/search", func(c *gin.Context) {
-		q := c.Query("q")
-		page := c.DefaultQuery("page", "1")
-		pageSize := c.DefaultQuery("page_size", "10")
+	// Endpoint principal /search usa el controlador para soportar filtros avanzados
+	router.GET("/search", searchController.Search)
 
-		pageInt, _ := strconv.Atoi(page)
-		pageSizeInt, _ := strconv.Atoi(pageSize)
-
-		results, err := searchService.Search(q, pageInt, pageSizeInt)
-		if err != nil {
-			c.JSON(500, gin.H{
-				"error":   "Search failed",
-				"message": err.Error(),
-			})
-			return
-		}
-
-		c.JSON(200, results)
-	})
-
-	// También podés montar el controller completo
+	// También podés montar el controller completo (alias)
 	router.GET("/search2", searchController.Search)
 
 	port := os.Getenv("PORT")

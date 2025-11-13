@@ -7,14 +7,12 @@ const Home = () => {
   const [canchas, setCanchas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   // Filtros - TODO LO MANEJA EL BACKEND
   const [filters, setFilters] = useState({
     q: '',
     type: '',
-    location: '',
-    min_price: '',
-    max_price: '',
+    number: '',
     available: '',
     sort_by: 'name',
     sort_order: 'asc',
@@ -51,8 +49,13 @@ const Home = () => {
 
       // LLAMADA AL BACKEND - search-api hace TODO el filtrado
       const response = await searchService.searchCanchas(params);
-      
-      setCanchas(response.results || []);
+      let results = response.results || [];
+      // Si el backend no filtra por number, aplicamos filtro en cliente como respaldo
+      if (params.number) {
+        results = results.filter(c => String(c.number) === String(params.number));
+      }
+
+      setCanchas(results);
       setPagination({
         total: response.total || 0,
         page: response.page || 1,
@@ -64,7 +67,24 @@ const Home = () => {
       // Si search-api no responde, intentar con canchas-api directamente
       try {
         const response = await canchaService.getAllCanchas();
-        setCanchas(response.canchas || []);
+        let results = response.canchas || [];
+
+        // Aplicar filtros en cliente como respaldo
+        if (filters.number) {
+          results = results.filter(c => String(c.number) === String(filters.number));
+        }
+        if (filters.type) {
+          results = results.filter(c => String(c.type).toLowerCase() === String(filters.type).toLowerCase());
+        }
+        if (filters.available === 'true') {
+          results = results.filter(c => c.available === true);
+        }
+        if (filters.q) {
+          const qLower = filters.q.toLowerCase();
+          results = results.filter(c => ((c.name && c.name.toLowerCase().includes(qLower)) || (c.description && c.description.toLowerCase().includes(qLower))));
+        }
+
+        setCanchas(results);
       } catch (err2) {
         setError('Error al cargar las canchas');
       }
@@ -99,9 +119,7 @@ const Home = () => {
     setFilters({
       q: '',
       type: '',
-      location: '',
-      min_price: '',
-      max_price: '',
+      number: '',
       available: '',
       sort_by: 'name',
       sort_order: 'asc',
@@ -147,36 +165,14 @@ const Home = () => {
             <option value="voley">Voley</option>
           </select>
 
-          {/* Ubicación */}
+          {/* Número de cancha (id) */}
           <input
             type="text"
-            name="location"
-            value={filters.location}
+            name="number"
+            value={filters.number}
             onChange={handleFilterChange}
-            placeholder="Ubicación"
+            placeholder="Número de cancha"
             style={styles.input}
-          />
-
-          {/* Precio mínimo */}
-          <input
-            type="number"
-            name="min_price"
-            value={filters.min_price}
-            onChange={handleFilterChange}
-            placeholder="Precio mín"
-            style={styles.inputSmall}
-            min="0"
-          />
-
-          {/* Precio máximo */}
-          <input
-            type="number"
-            name="max_price"
-            value={filters.max_price}
-            onChange={handleFilterChange}
-            placeholder="Precio máx"
-            style={styles.inputSmall}
-            min="0"
           />
 
           {/* Solo disponibles */}
@@ -253,11 +249,10 @@ const Home = () => {
                   </div>
 
                   <div style={styles.cardContent}>
-                    <h3 style={styles.cardTitle}>{cancha.name}</h3>
-                    
+                    <h3 style={styles.cardTitle}>{cancha.name} <span style={styles.cardNumber}>#{cancha.number || cancha.id}</span></h3>
+
                     <div style={styles.cardInfo}>
                       <span style={styles.badge}>{cancha.type}</span>
-                      <span style={styles.cardLocation}>📍 {cancha.location}</span>
                     </div>
 
                     <p style={styles.cardDescription}>
@@ -457,6 +452,12 @@ const styles = {
     fontSize: '1.2rem',
     marginBottom: '0.5rem',
     color: '#2c3e50',
+  },
+  cardNumber: {
+    fontSize: '0.85rem',
+    color: '#7f8c8d',
+    marginLeft: '0.5rem',
+    fontWeight: '600',
   },
   cardInfo: {
     display: 'flex',

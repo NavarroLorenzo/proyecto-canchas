@@ -13,6 +13,7 @@ type Cancha struct {
 	Description string             `bson:"description" json:"description"`
 	Location    string             `bson:"location" json:"location"`
 	Address     string             `bson:"address" json:"address"`
+	Number      int                `bson:"number" json:"number"`
 	Price       float64            `bson:"price" json:"price"`
 	Capacity    int                `bson:"capacity" json:"capacity"`
 	Available   bool               `bson:"available" json:"available"`
