@@ -49,9 +49,9 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 
 	// Añadir filtros adicionales (type, available) como condiciones AND
 	var fqParts []string
-	if req.Type != "" {
-		// type es un campo text_general; buscamos el token exacto (Solr normaliza a minúsculas)
-		fqParts = append(fqParts, fmt.Sprintf("type:%s", req.Type))
+	if typeFilter := strings.ToLower(strings.TrimSpace(req.Type)); typeFilter != "" {
+		// type es un campo text_general; almacenamos tokens en minúsculas
+		fqParts = append(fqParts, fmt.Sprintf("type:%s", typeFilter))
 	}
 	if req.Available != "" {
 		// available en Solr es booleano
@@ -77,7 +77,8 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 	switch sortField {
 	case "price", "capacity":
 		sortParam = fmt.Sprintf("%s %s", sortField, sortDir)
-		// Para campo "name" (text_general) no soporta sort directo, dejamos sort vacío.
+	case "name":
+		sortParam = fmt.Sprintf("name_sort %s", sortDir)
 	}
 
 	resp, err := ctrl.service.Search(finalQ, req.Page, req.PageSize, sortParam)
