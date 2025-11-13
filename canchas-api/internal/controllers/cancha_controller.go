@@ -31,7 +31,12 @@ func (ctrl *CanchaController) Create(c *gin.Context) {
 
 	cancha, err := ctrl.service.Create(&req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+		statusCode := http.StatusInternalServerError
+		if err.Error() == "Ya existe una cancha con ese número y de ese tipo." || err.Error() == "Ya existe una cancha con ese nombre." {
+			statusCode = http.StatusConflict // 409
+		}
+
+		c.JSON(statusCode, dto.ErrorResponse{
 			Error:   "Failed to create cancha",
 			Message: err.Error(),
 		})
@@ -97,6 +102,9 @@ func (ctrl *CanchaController) Update(c *gin.Context) {
 		statusCode := http.StatusInternalServerError
 		if err.Error() == "cancha not found" || err.Error() == "invalid ID format" {
 			statusCode = http.StatusNotFound
+		}
+		if err.Error() == "Ya existe una cancha con ese número y de ese tipo." || err.Error() == "Ya existe una cancha con ese nombre." {
+			statusCode = http.StatusConflict // 409
 		}
 
 		c.JSON(statusCode, dto.ErrorResponse{

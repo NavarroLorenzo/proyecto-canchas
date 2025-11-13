@@ -106,6 +106,8 @@ const Home = () => {
     }
   };
 
+  // Nota: eliminada la verificación por ID para evitar 404 en consola cuando el índice está desactualizado.
+
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters(prev => ({
@@ -248,44 +250,45 @@ const Home = () => {
               {canchas.map((cancha) => {
                 const descriptionText = normalizeField(cancha.description);
                 return (
-                <div key={cancha.id} style={styles.card}>
-                  <div style={styles.cardImage}>
-                    {cancha.image_url ? (
-                      <img
-                        src={cancha.image_url}
-                        alt={cancha.name}
-                        style={styles.image}
-                      />
-                    ) : (
-                      <div style={styles.imagePlaceholder}>
-                        {getTypeEmoji(cancha.type)}
+                  <div key={cancha.id} style={styles.card}>
+                    <div style={styles.cardImage}>
+                      {cancha.image_url ? (
+                        <img
+                          src={cancha.image_url}
+                          alt={cancha.name}
+                          style={styles.image}
+                        />
+                      ) : (
+                        <div style={styles.imagePlaceholder}>
+                          {getTypeEmoji(cancha.type)}
+                        </div>
+                      )}
+                    </div>
+
+                    <div style={styles.cardContent}>
+                      <h3 style={styles.cardTitle}>{cancha.name} <span style={styles.cardNumber}>#{cancha.number || cancha.id}</span></h3>
+
+                      <div style={styles.cardInfo}>
+                        <span style={styles.badge}>{cancha.type}</span>
                       </div>
-                    )}
-                  </div>
 
-                  <div style={styles.cardContent}>
-                    <h3 style={styles.cardTitle}>{cancha.name} <span style={styles.cardNumber}>#{cancha.number || cancha.id}</span></h3>
+                      <p style={styles.cardDescription}>
+                        {descriptionText.substring(0, 100)}...
+                      </p>
 
-                    <div style={styles.cardInfo}>
-                      <span style={styles.badge}>{cancha.type}</span>
-                    </div>
-
-                    <p style={styles.cardDescription}>
-                      {descriptionText.substring(0, 100)}...
-                    </p>
-
-                    <div style={styles.cardFooter}>
-                      <div style={styles.price}>${cancha.price}</div>
-                      <button
-                        onClick={() => navigate(`/cancha/${cancha.id}`)}
-                        style={styles.detailsBtn}
-                      >
-                        Ver Detalles
-                      </button>
+                      <div style={styles.cardFooter}>
+                        <div style={styles.price}>${cancha.price}</div>
+                        <button
+                          onClick={() => navigate(`/cancha/${cancha.id}`)}
+                          style={styles.detailsBtn}
+                        >
+                          Ver Detalles
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )})}
+                )
+              })}
             </div>
 
             {/* Paginación */}

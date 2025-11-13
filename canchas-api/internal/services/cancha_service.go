@@ -6,7 +6,9 @@ import (
 	"canchas-api/internal/dto"
 	"canchas-api/internal/messaging"
 	"canchas-api/internal/repositories"
+	"errors"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -40,6 +42,28 @@ func NewCanchaService(
 // Create crea una nueva cancha
 func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaResponse, error) {
 	// ❌ ELIMINAR validación de owner (ya no es necesario)
+
+	// Validar que no exista otra cancha con el mismo número y tipo
+	if req.Number > 0 && req.Type != "" {
+		existing, err := s.repo.GetByNumberAndType(req.Number, req.Type)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			return nil, errors.New("Ya existe una cancha con ese número y de ese tipo.")
+		}
+	}
+
+	// Validar que no exista otra cancha con el mismo nombre
+	if strings.TrimSpace(req.Name) != "" {
+		byName, err := s.repo.GetByName(req.Name)
+		if err != nil {
+			return nil, err
+		}
+		if byName != nil {
+			return nil, errors.New("Ya existe una cancha con ese nombre.")
+		}
+	}
 
 	// Crear la cancha
 	cancha := &domain.Cancha{
@@ -130,8 +154,41 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 	if req.Address != "" {
 		existing.Address = req.Address
 	}
-	if req.Number > 0 {
-		existing.Number = req.Number
+	if req.Number > 0 || req.Type != "" {
+		// Calcular el número y tipo resultantes después de la actualización
+		newNumber := existing.Number
+		if req.Number > 0 {
+			newNumber = req.Number
+		}
+		newType := existing.Type
+		if req.Type != "" {
+			newType = req.Type
+		}
+
+		// Si cambiaron number o type, validar unicidad sobre la pareja
+		if newNumber != existing.Number || newType != existing.Type {
+			found, err := s.repo.GetByNumberAndType(newNumber, newType)
+			if err != nil {
+				return nil, err
+			}
+			if found != nil && found.ID.Hex() != existing.ID.Hex() {
+				return nil, errors.New("Ya existe una cancha con ese número y de ese tipo.")
+			}
+			existing.Number = newNumber
+			existing.Type = newType
+		}
+	}
+
+	// Si cambió el nombre, validar unicidad del nombre
+	if req.Name != "" && req.Name != existing.Name {
+		byName, err := s.repo.GetByName(req.Name)
+		if err != nil {
+			return nil, err
+		}
+		if byName != nil && byName.ID.Hex() != existing.ID.Hex() {
+			return nil, errors.New("Ya existe una cancha con ese nombre.")
+		}
+		existing.Name = req.Name
 	}
 	if req.Price > 0 {
 		existing.Price = req.Price

@@ -4,17 +4,22 @@ import (
 	"canchas-api/internal/domain"
 	"context"
 	"errors"
+	"log"
+	"strings"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type CanchaRepository interface {
 	Create(cancha *domain.Cancha) error
 	GetByID(id string) (*domain.Cancha, error)
 	GetAll() ([]domain.Cancha, error)
+	GetByNumberAndType(number int, tipo string) (*domain.Cancha, error)
+	GetByName(name string) (*domain.Cancha, error)
 	Update(id string, cancha *domain.Cancha) error
 	Delete(id string) error
 	// ❌ ELIMINAR: GetByOwnerID(ownerID uint) ([]domain.Cancha, error)
@@ -25,9 +30,33 @@ type canchaRepository struct {
 }
 
 func NewCanchaRepository(db *mongo.Database) CanchaRepository {
-	return &canchaRepository{
-		collection: db.Collection(domain.Cancha{}.CollectionName()),
+	coll := db.Collection(domain.Cancha{}.CollectionName())
+	r := &canchaRepository{collection: coll}
+
+	// Ensure unique composite index on `number` and `type` to enforce DB-level uniqueness
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	indexModel := mongo.IndexModel{
+		Keys: bson.D{
+			{Key: "number", Value: 1},
+			{Key: "type", Value: 1},
+		},
+		Options: options.Index().SetUnique(true),
 	}
+	if _, err := coll.Indexes().CreateOne(ctx, indexModel); err != nil {
+		log.Printf("Warning: failed to create unique index on cancha.number+type: %v", err)
+	}
+
+	// Unique index on name to prevent duplicate names
+	indexName := mongo.IndexModel{
+		Keys:    bson.D{{Key: "name", Value: 1}},
+		Options: options.Index().SetUnique(true),
+	}
+	if _, err := coll.Indexes().CreateOne(ctx, indexName); err != nil {
+		log.Printf("Warning: failed to create unique index on cancha.name: %v", err)
+	}
+
+	return r
 }
 
 func (r *canchaRepository) Create(cancha *domain.Cancha) error {
@@ -39,7 +68,28 @@ func (r *canchaRepository) Create(cancha *domain.Cancha) error {
 	cancha.UpdatedAt = time.Now()
 
 	_, err := r.collection.InsertOne(ctx, cancha)
-	return err
+	if err != nil {
+		// Map Mongo duplicate key error to a clear application error
+		var we mongo.WriteException
+		if errors.As(err, &we) {
+			// Inspect error string to determine which index triggered the duplicate
+			msg := err.Error()
+			for _, e := range we.WriteErrors {
+				if e.Code == 11000 {
+					if strings.Contains(msg, "name") || strings.Contains(msg, "name_1") {
+						return errors.New("Ya existe una cancha con ese nombre.")
+					}
+					if strings.Contains(msg, "number") || strings.Contains(msg, "number_1") {
+						return errors.New("Ya existe una cancha con ese número y de ese tipo.")
+					}
+					// fallback
+					return errors.New("error de clave duplicada")
+				}
+			}
+		}
+		return err
+	}
+	return nil
 }
 
 func (r *canchaRepository) GetByID(id string) (*domain.Cancha, error) {
@@ -139,6 +189,42 @@ func (r *canchaRepository) Delete(id string) error {
 	}
 
 	return nil
+}
+
+// GetByNumber devuelve la cancha que tiene el número indicado.
+// Retorna (nil, nil) si no existe.
+func (r *canchaRepository) GetByNumberAndType(number int, tipo string) (*domain.Cancha, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var cancha domain.Cancha
+	err := r.collection.FindOne(ctx, bson.M{"number": number, "type": tipo}).Decode(&cancha)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &cancha, nil
+}
+
+// GetByName devuelve la cancha que tiene el nombre indicado.
+// Retorna (nil, nil) si no existe.
+func (r *canchaRepository) GetByName(name string) (*domain.Cancha, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var cancha domain.Cancha
+	err := r.collection.FindOne(ctx, bson.M{"name": name}).Decode(&cancha)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &cancha, nil
 }
 
 // ❌ ELIMINAR método GetByOwnerID

@@ -18,6 +18,7 @@ const Admin = () => {
   // Modal para crear/editar cancha
   const [showCanchaModal, setShowCanchaModal] = useState(false);
   const [editingCancha, setEditingCancha] = useState(null);
+  const [formError, setFormError] = useState('');
   const [canchaForm, setCanchaForm] = useState({
     name: '',
     type: 'futbol',
@@ -26,7 +27,6 @@ const Admin = () => {
     price: '',
     capacity: '',
     available: true,
-    image_url: '',
   });
 
   useEffect(() => {
@@ -67,8 +67,8 @@ const Admin = () => {
       price: '',
       capacity: '',
       available: true,
-      image_url: '',
     });
+    setFormError('');
     setShowCanchaModal(true);
   };
 
@@ -82,8 +82,8 @@ const Admin = () => {
       price: cancha.price.toString(),
       capacity: cancha.capacity.toString(),
       available: cancha.available,
-      image_url: cancha.image_url || '',
     });
+    setFormError('');
     setShowCanchaModal(true);
   };
 
@@ -114,7 +114,8 @@ const Admin = () => {
       setShowCanchaModal(false);
       fetchCanchas();
     } catch (err) {
-      alert('Error al guardar la cancha: ' + (err.response?.data?.message || err.message));
+      const msg = err.response?.data?.message || err.message;
+      setFormError(msg);
     }
   };
 
@@ -305,6 +306,11 @@ const Admin = () => {
             </h2>
 
             <form onSubmit={handleSubmitCancha} style={styles.form}>
+              {formError && (
+                <div style={styles.formError} role="alert">
+                  {formError}
+                </div>
+              )}
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
                   <label style={styles.label}>Nombre</label>
@@ -392,17 +398,7 @@ const Admin = () => {
                 </div>
               </div>
 
-              <div style={styles.formGroup}>
-                <label style={styles.label}>URL de Imagen</label>
-                <input
-                  type="url"
-                  name="image_url"
-                  value={canchaForm.image_url}
-                  onChange={handleCanchaFormChange}
-                  style={styles.input}
-                  placeholder="https://ejemplo.com/imagen.jpg"
-                />
-              </div>
+              {/* Eliminado: campo URL de Imagen — se usa emoji por defecto */}
 
               <div style={styles.checkboxGroup}>
                 <label style={styles.checkboxLabel}>
@@ -588,6 +584,13 @@ const styles = {
     width: '90%',
     maxHeight: '90vh',
     overflowY: 'auto',
+  },
+  formError: {
+    backgroundColor: '#fdecea',
+    color: '#c0392b',
+    padding: '0.75rem 1rem',
+    borderRadius: '6px',
+    marginBottom: '1rem',
   },
   modalTitle: {
     fontSize: '1.5rem',
