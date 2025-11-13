@@ -310,7 +310,7 @@ const CanchaDetails = () => {
           </div>
 
           <div style={styles.priceSection}>
-            <span style={styles.priceLabel}>Precio por hora:</span>
+            <span style={styles.priceLabel}>Precio por turno:</span>
             <span style={styles.price}>${cancha.price}</span>
           </div>
         </div>
@@ -429,7 +429,7 @@ const CanchaDetails = () => {
                     <span>{calculateDuration()} minutos</span>
                   </div>
                   <div style={styles.summaryRow}>
-                    <span>Precio por hora:</span>
+                    <span>Precio por turno:</span>
                     <span>${cancha.price}</span>
                   </div>
                   <div style={{ ...styles.summaryRow, ...styles.summaryTotal }}>

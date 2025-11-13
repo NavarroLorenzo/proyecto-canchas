@@ -15,6 +15,7 @@ import (
 
 type SearchService interface {
 	IndexCancha(data interface{}) error
+	DeleteCancha(id string) error
 	Search(q string, page, pageSize int, sort string) (*dto.SearchResponse, error)
 }
 
@@ -66,6 +67,33 @@ func (s *searchService) IndexCancha(data interface{}) error {
 	}
 
 	fmt.Println("[Solr] Cancha indexada correctamente en Solr.")
+	return nil
+}
+
+func (s *searchService) DeleteCancha(id string) error {
+	payload := map[string]interface{}{
+		"delete": map[string]string{
+			"query": fmt.Sprintf("id:%s", id),
+		},
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal delete payload: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send delete request to Solr: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Solr delete returned %d: %s", resp.StatusCode, string(body))
+	}
+
 	return nil
 }
 

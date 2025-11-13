@@ -68,19 +68,17 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 	}
 
 	sortField := strings.ToLower(req.SortBy)
-	switch sortField {
-	case "price":
-		sortField = "price"
-	case "capacity":
-		sortField = "capacity"
-	default:
-		sortField = "name"
-	}
 	sortDir := strings.ToLower(req.SortOrder)
 	if sortDir != "desc" {
 		sortDir = "asc"
 	}
-	sortParam := fmt.Sprintf("%s %s", sortField, sortDir)
+
+	sortParam := ""
+	switch sortField {
+	case "price", "capacity":
+		sortParam = fmt.Sprintf("%s %s", sortField, sortDir)
+		// Para campo "name" (text_general) no soporta sort directo, dejamos sort vacío.
+	}
 
 	resp, err := ctrl.service.Search(finalQ, req.Page, req.PageSize, sortParam)
 	if err != nil {

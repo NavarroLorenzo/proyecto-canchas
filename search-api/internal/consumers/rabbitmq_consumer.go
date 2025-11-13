@@ -108,7 +108,18 @@ func (r *RabbitConsumer) Listen(exchangeName, queueName string) error {
 			}
 
 			// Solo indexamos si es una cancha
-			if event.Entity == "cancha" {
+			if event.Entity != "cancha" {
+				continue
+			}
+
+			switch event.Type {
+			case "delete":
+				if err := r.service.DeleteCancha(event.EntityID); err != nil {
+					log.Printf("[Search] Failed to delete cancha from Solr: %v", err)
+				} else {
+					log.Printf("[Search] Cancha deleted from Solr: %s", event.EntityID)
+				}
+			default:
 				log.Printf("[Search] Indexing cancha from event: %s", event.Type)
 				if err := r.service.IndexCancha(event.Data); err != nil {
 					log.Printf("[Search] Failed to index cancha: %v", err)

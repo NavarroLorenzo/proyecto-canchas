@@ -365,7 +365,7 @@ const Admin = () => {
 
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Precio (por hora)</label>
+                  <label style={styles.label}>Precio (por turno)</label>
                   <input
                     type="number"
                     name="price"

@@ -13,39 +13,43 @@ import (
 )
 
 func main() {
-	// 1️⃣ Cargar configuración desde .env
 	config.LoadConfig()
 
-	// 2️⃣ Inicializar servicio y controlador
 	searchService := services.NewSearchService()
 	searchController := controllers.NewSearchController(searchService)
 
-	// 3️⃣ Iniciar consumer de RabbitMQ en segundo plano
 	go func() {
 		consumer, err := consumers.NewRabbitConsumer(os.Getenv("RABBITMQ_URL"), searchService)
 		if err != nil {
 			log.Fatalf("[RabbitMQ] Connection error: %v", err)
 		}
 
-		err = consumer.Listen(os.Getenv("RABBITMQ_EXCHANGE"), "search_queue")
-		if err != nil {
+		if err := consumer.Listen(os.Getenv("RABBITMQ_EXCHANGE"), "search_queue"); err != nil {
 			log.Fatalf("[RabbitMQ] Listen error: %v", err)
 		}
 	}()
 
-	// 4️⃣ Iniciar servidor HTTP
 	router := gin.Default()
 
-	// Endpoint principal /search usa el controlador para soportar filtros avanzados
-	router.GET("/search", searchController.Search)
+	router.Use(func(c *gin.Context) {
+		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
+		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
+		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+		c.Next()
+	})
 
-	// También podés montar el controller completo (alias)
+	router.GET("/search", searchController.Search)
 	router.GET("/search2", searchController.Search)
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8083"
 	}
+
 	log.Printf("[HTTP] Search API running on port %s", port)
 	if err := router.Run(":" + port); err != nil {
 		log.Fatalf("Server error: %v", err)

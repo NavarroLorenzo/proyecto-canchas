@@ -1,10 +1,9 @@
 * {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
 body {
+  margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
@@ -15,80 +14,5 @@ body {
 
 .App {
   min-height: 100vh;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-  /* Home grid */
-  .grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Filter form */
-  .filterForm {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Cancha details */
-  .content {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* Admin table */
-  table {
-    font-size: 0.85rem;
-  }
-
-  th, td {
-    padding: 0.5rem !important;
-  }
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #888;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #555;
-}
-
-/* Animations */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.card {
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-/* Button hover effects */
-button {
-  transition: all 0.3s ease;
-}
-
-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  background-color: #f5f5f5;
 }

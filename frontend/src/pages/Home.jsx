@@ -34,6 +34,13 @@ const Home = () => {
     fetchCanchas();
   }, [filters]);
 
+  const normalizeField = (value) => {
+    if (Array.isArray(value)) {
+      return value[0] ?? '';
+    }
+    return value ?? '';
+  };
+
   const fetchCanchas = async () => {
     setLoading(true);
     setError('');
@@ -85,6 +92,12 @@ const Home = () => {
         }
 
         setCanchas(results);
+        setPagination({
+          total: results.length,
+          page: 1,
+          page_size: results.length || filters.page_size,
+          total_pages: 1,
+        });
       } catch (err2) {
         setError('Error al cargar las canchas');
       }
@@ -232,7 +245,9 @@ const Home = () => {
             </div>
 
             <div style={styles.grid}>
-              {canchas.map((cancha) => (
+              {canchas.map((cancha) => {
+                const descriptionText = normalizeField(cancha.description);
+                return (
                 <div key={cancha.id} style={styles.card}>
                   <div style={styles.cardImage}>
                     {cancha.image_url ? (
@@ -256,11 +271,11 @@ const Home = () => {
                     </div>
 
                     <p style={styles.cardDescription}>
-                      {cancha.description.substring(0, 100)}...
+                      {descriptionText.substring(0, 100)}...
                     </p>
 
                     <div style={styles.cardFooter}>
-                      <div style={styles.price}>${cancha.price}/hora</div>
+                      <div style={styles.price}>${cancha.price}</div>
                       <button
                         onClick={() => navigate(`/cancha/${cancha.id}`)}
                         style={styles.detailsBtn}
@@ -270,7 +285,7 @@ const Home = () => {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
 
             {/* Paginación */}

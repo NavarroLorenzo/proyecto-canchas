@@ -80,10 +80,10 @@ func CalculateDuration(startTime, endTime string) (int, error) {
 	return int(duration.Minutes()), nil
 }
 
-// CalculatePrice calcula el precio basado en duración y precio por hora
-func CalculatePrice(pricePerHour float64, durationMinutes int) float64 {
-	hours := float64(durationMinutes) / 60.0
-	return pricePerHour * hours
+// CalculatePrice devuelve el precio total del turno.
+// El valor almacenado en la cancha ya representa el costo completo.
+func CalculatePrice(pricePerTurn float64, _ int) float64 {
+	return pricePerTurn
 }
 
 // ParseDate convierte un string de fecha a time.Time
