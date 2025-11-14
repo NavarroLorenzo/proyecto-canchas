@@ -69,7 +69,34 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 		finalQ = fmt.Sprintf("(%s) AND %s", baseQ, strings.Join(fqParts, " AND "))
 	}
 
-	resp, err := ctrl.service.Search(finalQ, fqParts, req.Page, req.PageSize, "")
+	// Construir string de ordenamiento para Solr
+	var sortStr string
+	if req.SortBy != "" {
+		// Mapear campos del frontend a campos de Solr
+		solrField := req.SortBy
+		switch req.SortBy {
+		case "name":
+			// Usar name_sort que es el campo optimizado para ordenamiento
+			solrField = "name_sort"
+		case "price":
+			solrField = "price"
+		case "capacity":
+			solrField = "capacity"
+		}
+
+		// Determinar dirección de ordenamiento
+		order := "asc"
+		if req.SortOrder != "" {
+			order = strings.ToLower(req.SortOrder)
+		}
+		if order != "asc" && order != "desc" {
+			order = "asc"
+		}
+
+		sortStr = fmt.Sprintf("%s %s", solrField, order)
+	}
+
+	resp, err := ctrl.service.Search(finalQ, fqParts, req.Page, req.PageSize, sortStr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error:   "Search failed",
