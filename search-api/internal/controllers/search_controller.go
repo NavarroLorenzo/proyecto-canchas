@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"search-api/internal/dto"
 	"search-api/internal/services"
+	"search-api/internal/utils"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -50,8 +51,9 @@ func (ctrl *SearchController) Search(c *gin.Context) {
 	// Añadir filtros adicionales (type, available) como condiciones AND
 	var fqParts []string
 	if req.Type != "" {
-		// type es un campo text_general; buscamos el token exacto (Solr normaliza a minúsculas)
-		fqParts = append(fqParts, fmt.Sprintf("type:%s", req.Type))
+		// Normalizar tipo (minusculas y sin acentos) para que coincida con el indexado
+		t := utils.NormalizeString(req.Type)
+		fqParts = append(fqParts, fmt.Sprintf("type:%s", t))
 	}
 	if req.Available != "" {
 		// available en Solr es booleano

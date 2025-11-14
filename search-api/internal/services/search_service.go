@@ -16,6 +16,7 @@ import (
 	"search-api/config"
 	"search-api/internal/cache"
 	"search-api/internal/dto"
+	"search-api/internal/utils"
 )
 
 type SearchService interface {
@@ -33,7 +34,7 @@ type searchService struct {
 func NewSearchService(cacheManager *cache.Manager) SearchService {
 	solrURL := config.AppConfig.SolrURL
 	coreName := config.AppConfig.SolrCore
-	
+
 	if solrURL == "" {
 		solrURL = "http://localhost:8983/solr"
 		log.Println("[SearchService] SOLR_URL not set, using default:", solrURL)
@@ -42,7 +43,7 @@ func NewSearchService(cacheManager *cache.Manager) SearchService {
 		coreName = "canchas"
 		log.Println("[SearchService] SOLR_CORE not set, using default:", coreName)
 	}
-	
+
 	return &searchService{
 		solrURL:  solrURL,
 		coreName: coreName,
@@ -65,10 +66,10 @@ func (s *searchService) IndexCancha(data interface{}) error {
 	if name, ok := doc["name"].(string); ok && name != "" {
 		doc["name_sort"] = strings.ToLower(name)
 	}
-	
-	// Normalizar el campo type a minúsculas para búsquedas consistentes
+
+	// Normalizar el campo type para búsquedas consistentes (minusculas + sin acentos)
 	if typeVal, ok := doc["type"].(string); ok && typeVal != "" {
-		doc["type"] = strings.ToLower(strings.TrimSpace(typeVal))
+		doc["type"] = utils.NormalizeString(typeVal)
 	}
 
 	payload := map[string]interface{}{
@@ -141,7 +142,7 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 
 	start := (page - 1) * pageSize
 	params := url.Values{}
-	
+
 	// Para búsquedas de texto, usar wildcards para permitir coincidencias parciales
 	searchQuery := q
 	if q != "*:*" && !strings.Contains(q, ":") {
@@ -149,7 +150,7 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 		// agregar wildcards para permitir coincidencias parciales
 		searchQuery = fmt.Sprintf("*%s*", q)
 	}
-	
+
 	params.Set("q", searchQuery)
 	params.Set("start", fmt.Sprintf("%d", start))
 	params.Set("rows", fmt.Sprintf("%d", pageSize))
@@ -157,12 +158,12 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 	params.Set("defType", "edismax")
 	params.Set("qf", "name description location address number")
 	params.Set("mm", "1") // Minimum match: al menos 1 término debe coincidir
-	
+
 	// Agregar filtros fq (filter queries) - más eficientes que incluirlos en la query principal
 	for _, fq := range fqFilters {
 		params.Add("fq", fq)
 	}
-	
+
 	if sort != "" {
 		params.Set("sort", sort)
 	}
@@ -194,20 +195,20 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 		body, _ := io.ReadAll(resp.Body)
 		bodyStr := string(body)
 		log.Printf("[SearchService] Solr returned error %d: %s", resp.StatusCode, bodyStr)
-		
+
 		// Si el error es por ordenamiento (especialmente name_sort), intentar sin ordenamiento
 		if strings.Contains(bodyStr, "can not sort") && sort != "" {
 			log.Printf("[SearchService] Retrying without sort parameter due to sort error")
 			// Reintentar sin el parámetro de ordenamiento
 			params.Del("sort")
 			endpoint = fmt.Sprintf("%s/%s/select?%s", s.solrURL, s.coreName, params.Encode())
-			
+
 			retryResp, retryErr := http.Get(endpoint)
 			if retryErr != nil {
 				return nil, fmt.Errorf("failed to query Solr at %s: %v", s.solrURL, retryErr)
 			}
 			defer retryResp.Body.Close()
-			
+
 			if retryResp.StatusCode == http.StatusOK {
 				resp = retryResp
 			} else {

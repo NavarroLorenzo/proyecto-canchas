@@ -62,6 +62,44 @@ const Home = () => {
         results = results.filter(c => String(c.number) === String(params.number));
       }
 
+      // Si search-api devolvió 0 resultados pero el usuario filtró por tipo,
+      // intentar respaldo rápido: obtener todas las canchas desde canchas-api
+      // y aplicar el filtro en cliente usando comparación sin acentos.
+      const normalize = (s) => {
+        if (!s) return '';
+        return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+      };
+
+      // Si no hay resultados y el usuario filtró por tipo o por disponibilidad,
+      // intentar fallback obteniendo todas las canchas y filtrando en cliente.
+      if ((results.length === 0) && (filters.type || filters.available === 'true')) {
+        try {
+          const allResp = await canchaService.getAllCanchas();
+          let allResults = allResp.canchas || [];
+          // Aplicar filtro por tipo si existe
+          if (filters.type) {
+            const wanted = normalize(filters.type);
+            allResults = allResults.filter(c => normalize(c.type) === wanted);
+          }
+          // Aplicar filtro de disponibilidad si está activado
+          if (filters.available === 'true') {
+            allResults = allResults.filter(c => c.available === true);
+          }
+          // Además aplicar filtro por number si existe
+          if (filters.number) {
+            allResults = allResults.filter(c => String(c.number) === String(filters.number));
+          }
+          results = allResults;
+          // Ajustar paginación local
+          response.total = allResults.length;
+          response.page = 1;
+          response.page_size = allResults.length || filters.page_size;
+          response.total_pages = 1;
+        } catch (err) {
+          // si falla el fallback, seguimos con resultados vacíos
+        }
+      }
+
       setCanchas(results);
       setPagination({
         total: response.total || 0,
