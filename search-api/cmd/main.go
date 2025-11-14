@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"time"
 
 	"search-api/config"
 	"search-api/internal/cache"
@@ -21,12 +22,26 @@ func main() {
 	searchController := controllers.NewSearchController(searchService)
 
 	go func() {
-		consumer, err := consumers.NewRabbitConsumer(os.Getenv("RABBITMQ_URL"), searchService)
+		const maxAttempts = 5
+		for attempt := 1; attempt <= maxAttempts; attempt++ {
+			if err := searchService.ReindexAllCanchas(); err != nil {
+				log.Printf("[Reindex] Attempt %d/%d failed: %v", attempt, maxAttempts, err)
+				time.Sleep(5 * time.Second)
+				continue
+			}
+			log.Printf("[Reindex] Completed successfully on attempt %d", attempt)
+			return
+		}
+		log.Printf("[Reindex] Failed after %d attempts, continuing without a fresh index", maxAttempts)
+	}()
+
+	go func() {
+		consumer, err := consumers.NewRabbitConsumer(config.AppConfig.RabbitMQURL, searchService)
 		if err != nil {
 			log.Fatalf("[RabbitMQ] Connection error: %v", err)
 		}
 
-		if err := consumer.Listen(os.Getenv("RABBITMQ_EXCHANGE"), "search_queue"); err != nil {
+		if err := consumer.Listen(config.AppConfig.RabbitMQExchange, config.AppConfig.RabbitMQQueue); err != nil {
 			log.Fatalf("[RabbitMQ] Listen error: %v", err)
 		}
 	}()

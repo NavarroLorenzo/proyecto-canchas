@@ -18,7 +18,8 @@ type Claims struct {
 
 // GenerateToken genera un token JWT para un usuario
 func GenerateToken(user *domain.User) (string, error) {
-	expirationTime := time.Now().Add(time.Duration(config.AppConfig.JWTExpirationHours) * time.Hour)
+	// Token expira en 5 minutos
+	expirationTime := time.Now().Add(10 * time.Minute)
 
 	claims := &Claims{
 		UserID:   user.ID,

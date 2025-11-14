@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"search-api/config"
 	"search-api/internal/cache"
@@ -23,17 +25,21 @@ type SearchService interface {
 	IndexCancha(data interface{}) error
 	DeleteCancha(id string) error
 	Search(q string, fqFilters []string, page, pageSize int, sort string) (*dto.SearchResponse, error)
+	ReindexAllCanchas() error
 }
 
 type searchService struct {
-	solrURL  string
-	coreName string
-	cache    *cache.Manager
+	solrURL       string
+	coreName      string
+	cache         *cache.Manager
+	canchasAPIURL string
+	httpClient    *http.Client
 }
 
 func NewSearchService(cacheManager *cache.Manager) SearchService {
 	solrURL := config.AppConfig.SolrURL
 	coreName := config.AppConfig.SolrCore
+	canchasAPIURL := config.AppConfig.CanchasAPIURL
 
 	if solrURL == "" {
 		solrURL = "http://localhost:8983/solr"
@@ -45,9 +51,13 @@ func NewSearchService(cacheManager *cache.Manager) SearchService {
 	}
 
 	return &searchService{
-		solrURL:  solrURL,
-		coreName: coreName,
-		cache:    cacheManager,
+		solrURL:       solrURL,
+		coreName:      coreName,
+		cache:         cacheManager,
+		canchasAPIURL: canchasAPIURL,
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+		},
 	}
 }
 
@@ -124,6 +134,86 @@ func (s *searchService) DeleteCancha(id string) error {
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("Solr delete returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	if s.cache != nil {
+		s.cache.InvalidateAll()
+	}
+	return nil
+}
+
+// ReindexAllCanchas vuelve a poblar Solr leyendo todas las canchas desde canchas-api.
+func (s *searchService) ReindexAllCanchas() error {
+	if s.canchasAPIURL == "" {
+		return errors.New("CANCHAS_API_URL is not configured")
+	}
+
+	apiURL := strings.TrimRight(s.canchasAPIURL, "/")
+	reqURL := fmt.Sprintf("%s/canchas", apiURL)
+
+	log.Printf("[Reindex] Fetching canchas from %s", reqURL)
+	resp, err := s.httpClient.Get(reqURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch canchas for reindex: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("canchas API returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var payload struct {
+		Canchas []map[string]interface{} `json:"canchas"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return fmt.Errorf("failed to decode canchas response: %w", err)
+	}
+
+	log.Printf("[Reindex] Clearing Solr core before reindexing")
+	if err := s.clearSolrIndex(); err != nil {
+		return err
+	}
+
+	var failed int
+	for _, cancha := range payload.Canchas {
+		if err := s.IndexCancha(cancha); err != nil {
+			log.Printf("[Reindex] Failed to index cancha %+v: %v", cancha["id"], err)
+			failed++
+		}
+	}
+
+	if failed > 0 {
+		return fmt.Errorf("reindex completed with %d failures", failed)
+	}
+
+	log.Printf("[Reindex] Reindex completed. Total canchas indexed: %d", len(payload.Canchas))
+	return nil
+}
+
+func (s *searchService) clearSolrIndex() error {
+	payload := map[string]interface{}{
+		"delete": map[string]string{
+			"query": "*:*",
+		},
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal clear index payload: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
+	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to clear Solr index: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("Solr clear returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	if s.cache != nil {

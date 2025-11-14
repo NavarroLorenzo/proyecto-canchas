@@ -78,7 +78,7 @@ func (r *RabbitConsumer) Listen(exchangeName, queueName string) error {
 	msgs, err := r.channel.Consume(
 		q.Name, // cola
 		"",     // consumer tag
-		true,   // auto-ack (true = confirma automáticamente)
+		false,  // auto-ack desactivado para no perder eventos cuando Solr falla
 		false,  // exclusive
 		false,  // no-local
 		false,  // no-wait
@@ -112,20 +112,28 @@ func (r *RabbitConsumer) Listen(exchangeName, queueName string) error {
 				continue
 			}
 
+			var processingErr error
 			switch event.Type {
 			case "delete":
-				if err := r.service.DeleteCancha(event.EntityID); err != nil {
-					log.Printf("[Search] Failed to delete cancha from Solr: %v", err)
-				} else {
-					log.Printf("[Search] Cancha deleted from Solr: %s", event.EntityID)
-				}
+				processingErr = r.service.DeleteCancha(event.EntityID)
 			default:
 				log.Printf("[Search] Indexing cancha from event: %s", event.Type)
-				if err := r.service.IndexCancha(event.Data); err != nil {
-					log.Printf("[Search] Failed to index cancha: %v", err)
-				} else {
-					log.Printf("[Search] Cancha indexed successfully")
+				processingErr = r.service.IndexCancha(event.Data)
+			}
+
+			if processingErr != nil {
+				log.Printf("[Search] Failed to process event (%s): %v. Requeueing...", event.Type, processingErr)
+				// Requeue the message so it can be processed once Solr is back online.
+				if err := d.Nack(false, true); err != nil {
+					log.Printf("[Search] Failed to nack message: %v", err)
 				}
+				continue
+			}
+
+			if err := d.Ack(false); err != nil {
+				log.Printf("[Search] Failed to ack message: %v", err)
+			} else {
+				log.Printf("[Search] Message processed successfully")
 			}
 		}
 	}()
