@@ -1,7 +1,6 @@
 package services
 
 import (
-	"bytes"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
@@ -18,6 +17,7 @@ import (
 	"search-api/config"
 	"search-api/internal/cache"
 	"search-api/internal/dto"
+	"search-api/internal/repositories"
 	"search-api/internal/utils"
 )
 
@@ -29,17 +29,15 @@ type SearchService interface {
 }
 
 type searchService struct {
-	solrURL       string
-	coreName      string
 	cache         *cache.Manager
 	canchasAPIURL string
+	solrRepo      repositories.SolrRepository
 	httpClient    *http.Client
 }
 
-func NewSearchService(cacheManager *cache.Manager) SearchService {
+func NewSearchService(cacheManager *cache.Manager, solrRepo repositories.SolrRepository, canchasAPIURL string) SearchService {
 	solrURL := config.AppConfig.SolrURL
 	coreName := config.AppConfig.SolrCore
-	canchasAPIURL := config.AppConfig.CanchasAPIURL
 
 	if solrURL == "" {
 		solrURL = "http://localhost:8983/solr"
@@ -50,14 +48,15 @@ func NewSearchService(cacheManager *cache.Manager) SearchService {
 		log.Println("[SearchService] SOLR_CORE not set, using default:", coreName)
 	}
 
+	if solrRepo == nil {
+		solrRepo = repositories.NewSolrRepository(solrURL, coreName, nil)
+	}
+
 	return &searchService{
-		solrURL:       solrURL,
-		coreName:      coreName,
 		cache:         cacheManager,
 		canchasAPIURL: canchasAPIURL,
-		httpClient: &http.Client{
-			Timeout: 15 * time.Second,
-		},
+		solrRepo:      solrRepo,
+		httpClient:    &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -82,27 +81,8 @@ func (s *searchService) IndexCancha(data interface{}) error {
 		doc["type"] = utils.NormalizeString(typeVal)
 	}
 
-	payload := map[string]interface{}{
-		"add": map[string]interface{}{
-			"doc": doc,
-		},
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal Solr payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
+	if err := s.solrRepo.Add(doc); err != nil {
 		return fmt.Errorf("failed to send data to Solr: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Solr returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	log.Println("[Solr] Cancha indexada correctamente en Solr.")
@@ -113,27 +93,8 @@ func (s *searchService) IndexCancha(data interface{}) error {
 }
 
 func (s *searchService) DeleteCancha(id string) error {
-	payload := map[string]interface{}{
-		"delete": map[string]string{
-			"query": fmt.Sprintf("id:%s", id),
-		},
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal delete payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
+	if err := s.solrRepo.DeleteByQuery(fmt.Sprintf("id:%s", id)); err != nil {
 		return fmt.Errorf("failed to send delete request to Solr: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Solr delete returned %d: %s", resp.StatusCode, string(body))
 	}
 
 	if s.cache != nil {
@@ -172,8 +133,8 @@ func (s *searchService) ReindexAllCanchas() error {
 	}
 
 	log.Printf("[Reindex] Clearing Solr core before reindexing")
-	if err := s.clearSolrIndex(); err != nil {
-		return err
+	if err := s.solrRepo.ClearAll(); err != nil {
+		return fmt.Errorf("failed to clear Solr index: %w", err)
 	}
 
 	var failed int
@@ -189,36 +150,6 @@ func (s *searchService) ReindexAllCanchas() error {
 	}
 
 	log.Printf("[Reindex] Reindex completed. Total canchas indexed: %d", len(payload.Canchas))
-	return nil
-}
-
-func (s *searchService) clearSolrIndex() error {
-	payload := map[string]interface{}{
-		"delete": map[string]string{
-			"query": "*:*",
-		},
-	}
-
-	jsonData, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("failed to marshal clear index payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/%s/update?commit=true", s.solrURL, s.coreName)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return fmt.Errorf("failed to clear Solr index: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("Solr clear returned %d: %s", resp.StatusCode, string(body))
-	}
-
-	if s.cache != nil {
-		s.cache.InvalidateAll()
-	}
 	return nil
 }
 
@@ -265,70 +196,27 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 		}
 	}
 
-	if s.solrURL == "" {
-		return nil, fmt.Errorf("SOLR_URL is not configured")
-	}
-	if s.coreName == "" {
-		return nil, fmt.Errorf("SOLR_CORE is not configured")
-	}
-
-	endpoint := fmt.Sprintf("%s/%s/select?%s", s.solrURL, s.coreName, params.Encode())
-
-	resp, err := http.Get(endpoint)
+	docs, numFound, err := s.solrRepo.Search(params.Encode())
 	if err != nil {
-		log.Printf("[SearchService] Error connecting to Solr at %s: %v", s.solrURL, err)
-		return nil, fmt.Errorf("failed to query Solr at %s: %v", s.solrURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		bodyStr := string(body)
-		log.Printf("[SearchService] Solr returned error %d: %s", resp.StatusCode, bodyStr)
-
 		// Si el error es por ordenamiento (especialmente name_sort), intentar sin ordenamiento
-		if strings.Contains(bodyStr, "can not sort") && sort != "" {
+		if strings.Contains(err.Error(), "can not sort") && sort != "" {
 			log.Printf("[SearchService] Retrying without sort parameter due to sort error")
-			// Reintentar sin el parámetro de ordenamiento
 			params.Del("sort")
-			endpoint = fmt.Sprintf("%s/%s/select?%s", s.solrURL, s.coreName, params.Encode())
-
-			retryResp, retryErr := http.Get(endpoint)
-			if retryErr != nil {
-				return nil, fmt.Errorf("failed to query Solr at %s: %v", s.solrURL, retryErr)
-			}
-			defer retryResp.Body.Close()
-
-			if retryResp.StatusCode == http.StatusOK {
-				resp = retryResp
-			} else {
-				return nil, fmt.Errorf("Solr error %d: %s", resp.StatusCode, bodyStr)
-			}
-		} else {
-			return nil, fmt.Errorf("Solr error %d: %s", resp.StatusCode, bodyStr)
+			docs, numFound, err = s.solrRepo.Search(params.Encode())
+		}
+		if err != nil {
+			return nil, err
 		}
 	}
 
-	var solrResp struct {
-		Response struct {
-			NumFound int                      `json:"numFound"`
-			Start    int                      `json:"start"`
-			Docs     []map[string]interface{} `json:"docs"`
-		} `json:"response"`
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&solrResp); err != nil {
-		return nil, fmt.Errorf("failed to decode Solr response: %v", err)
-	}
-
-	totalPages := int(math.Ceil(float64(solrResp.Response.NumFound) / float64(pageSize)))
+	totalPages := int(math.Ceil(float64(numFound) / float64(pageSize)))
 	if totalPages == 0 {
 		totalPages = 1
 	}
 
 	result := &dto.SearchResponse{
-		Results:    solrResp.Response.Docs,
-		Total:      solrResp.Response.NumFound,
+		Results:    docs,
+		Total:      numFound,
 		Page:       page,
 		PageSize:   pageSize,
 		TotalPages: totalPages,

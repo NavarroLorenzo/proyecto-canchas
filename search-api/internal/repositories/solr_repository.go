@@ -4,49 +4,54 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
-	"search-api/internal/domain"
+	"time"
 )
 
 type SolrRepository interface {
-	Search(query string, filters map[string]string, sort string, start, rows int) ([]domain.CanchaSearch, int64, error)
-	AddOrUpdate(cancha domain.CanchaSearch) error
-	Delete(id string) error
+	Search(params string) ([]map[string]interface{}, int, error)
+	Add(doc map[string]interface{}) error
+	DeleteByQuery(query string) error
+	ClearAll() error
 }
 
 type solrRepository struct {
-	baseURL string
-	core    string
+	baseURL    string
+	core       string
+	httpClient *http.Client
 }
 
-func NewSolrRepository(baseURL, core string) SolrRepository {
+func NewSolrRepository(baseURL, core string, httpClient *http.Client) SolrRepository {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
 	return &solrRepository{
-		baseURL: baseURL,
-		core:    core,
+		baseURL:    baseURL,
+		core:       core,
+		httpClient: httpClient,
 	}
 }
 
-// 🔹 Ejecutar búsqueda en Solr
-func (r *solrRepository) Search(query string, filters map[string]string, sort string, start, rows int) ([]domain.CanchaSearch, int64, error) {
-	url := fmt.Sprintf("%s/%s/select?q=%s&start=%d&rows=%d&sort=%s&wt=json",
-		r.baseURL, r.core, query, start, rows, sort)
+// Search ejecuta una query completa (params ya viene url-encoded) contra Solr.
+func (r *solrRepository) Search(params string) ([]map[string]interface{}, int, error) {
+	url := fmt.Sprintf("%s/%s/select?%s", r.baseURL, r.core, params)
 
-	for k, v := range filters {
-		url += fmt.Sprintf("&fq=%s:%s", k, v)
-	}
-
-	resp, err := http.Get(url)
+	resp, err := r.httpClient.Get(url)
 	if err != nil {
 		return nil, 0, err
 	}
 	defer resp.Body.Close()
 
-	body, _ := ioutil.ReadAll(resp.Body)
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, 0, fmt.Errorf("Solr returned %d: %s", resp.StatusCode, string(body))
+	}
+
 	var result struct {
 		Response struct {
-			Docs []domain.CanchaSearch `json:"docs"`
-			Num  int64                 `json:"numFound"`
+			Docs []map[string]interface{} `json:"docs"`
+			Num  int                     `json:"numFound"`
 		} `json:"response"`
 	}
 	if err := json.Unmarshal(body, &result); err != nil {
@@ -56,39 +61,60 @@ func (r *solrRepository) Search(query string, filters map[string]string, sort st
 	return result.Response.Docs, result.Response.Num, nil
 }
 
-// 🔹 Agregar o actualizar una cancha
-func (r *solrRepository) AddOrUpdate(cancha domain.CanchaSearch) error {
-	data := []domain.CanchaSearch{cancha}
-	jsonData, _ := json.Marshal(data)
+// Add agrega o actualiza un documento.
+func (r *solrRepository) Add(doc map[string]interface{}) error {
+	payload := map[string]interface{}{
+		"add": map[string]interface{}{
+			"doc": doc,
+		},
+	}
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
 
 	url := fmt.Sprintf("%s/%s/update?commit=true", r.baseURL, r.core)
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
+	resp, err := r.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("error al indexar cancha: %s", string(body))
 	}
 	return nil
 }
 
-// 🔹 Borrar cancha por ID
-func (r *solrRepository) Delete(id string) error {
-	deleteCmd := fmt.Sprintf(`{"delete":{"id":"%s"}}`, id)
-	url := fmt.Sprintf("%s/%s/update?commit=true", r.baseURL, r.core)
+// DeleteByQuery elimina documentos que cumplan la query (por ejemplo id:xxx o *:*).
+func (r *solrRepository) DeleteByQuery(query string) error {
+	payload := map[string]interface{}{
+		"delete": map[string]string{
+			"query": query,
+		},
+	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer([]byte(deleteCmd)))
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/%s/update?commit=true", r.baseURL, r.core)
+	resp, err := r.httpClient.Post(url, "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := ioutil.ReadAll(resp.Body)
+		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("error al borrar cancha: %s", string(body))
 	}
 	return nil
+}
+
+// ClearAll elimina todos los documentos del core.
+func (r *solrRepository) ClearAll() error {
+	return r.DeleteByQuery("*:*")
 }

@@ -9,6 +9,7 @@ import (
 	"search-api/internal/cache"
 	"search-api/internal/consumers"
 	"search-api/internal/controllers"
+	"search-api/internal/repositories"
 	"search-api/internal/services"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,8 @@ func main() {
 	config.LoadConfig()
 
 	cacheManager := cache.NewCacheManager(config.AppConfig)
-	searchService := services.NewSearchService(cacheManager)
+	solrRepo := repositories.NewSolrRepository(config.AppConfig.SolrURL, config.AppConfig.SolrCore, nil)
+	searchService := services.NewSearchService(cacheManager, solrRepo, config.AppConfig.CanchasAPIURL)
 	searchController := controllers.NewSearchController(searchService)
 
 	go func() {

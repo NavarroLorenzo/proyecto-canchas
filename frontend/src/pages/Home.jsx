@@ -57,6 +57,24 @@ const Home = () => {
       // LLAMADA AL BACKEND - search-api hace TODO el filtrado
       const response = await searchService.searchCanchas(params);
       let results = response.results || [];
+
+      // Seguridad extra: filtrar por texto en cliente si hay q y el backend devolvió más de lo esperado
+      if (filters.q) {
+        const normalize = (s) => {
+          if (!s) return '';
+          return s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+        };
+        const q = normalize(filters.q);
+        results = results.filter(c => {
+          const fields = [
+            normalizeField(c.name),
+            normalizeField(c.description),
+            normalizeField(c.location),
+            normalizeField(c.address),
+          ].map(normalize);
+          return fields.some(f => f.includes(q));
+        });
+      }
       // Si el backend no filtra por number, aplicamos filtro en cliente como respaldo
       if (params.number) {
         results = results.filter(c => String(c.number) === String(params.number));
