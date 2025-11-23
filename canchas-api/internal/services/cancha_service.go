@@ -41,7 +41,7 @@ func NewCanchaService(
 
 // Create crea una nueva cancha
 func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaResponse, error) {
-	// �?O ELIMINAR validaci��n de owner (ya no es necesario)
+	// Validación de negocio: unicidad por número+tipo
 
 	// Validar que no exista otra cancha con el mismo nǧmero y tipo
 	if req.Number > 0 && req.Type != "" {
