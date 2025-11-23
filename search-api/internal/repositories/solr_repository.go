@@ -33,7 +33,7 @@ func NewSolrRepository(baseURL, core string, httpClient *http.Client) SolrReposi
 	}
 }
 
-// Search ejecuta una query completa (params ya viene url-encoded) contra Solr.
+// Search ejecuta una query completa en Solr; params ya debe venir url-encoded.
 func (r *solrRepository) Search(params string) ([]map[string]interface{}, int, error) {
 	url := fmt.Sprintf("%s/%s/select?%s", r.baseURL, r.core, params)
 
@@ -61,7 +61,7 @@ func (r *solrRepository) Search(params string) ([]map[string]interface{}, int, e
 	return result.Response.Docs, result.Response.Num, nil
 }
 
-// Add agrega o actualiza un documento.
+// Add agrega o actualiza un documento en el core.
 func (r *solrRepository) Add(doc map[string]interface{}) error {
 	payload := map[string]interface{}{
 		"add": map[string]interface{}{
@@ -87,7 +87,7 @@ func (r *solrRepository) Add(doc map[string]interface{}) error {
 	return nil
 }
 
-// DeleteByQuery elimina documentos que cumplan la query (por ejemplo id:xxx o *:*).
+// DeleteByQuery elimina documentos que cumplan la query (id:xxx, *:*, etc).
 func (r *solrRepository) DeleteByQuery(query string) error {
 	payload := map[string]interface{}{
 		"delete": map[string]string{

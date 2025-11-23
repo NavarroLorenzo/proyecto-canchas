@@ -167,8 +167,7 @@ func (s *searchService) Search(q string, fqFilters []string, page, pageSize int,
 	// Para búsquedas de texto, usar wildcards para permitir coincidencias parciales
 	searchQuery := q
 	if q != "*:*" && !strings.Contains(q, ":") {
-		// Si es una búsqueda de texto libre (no es una query específica de campo),
-		// agregar wildcards para permitir coincidencias parciales
+		// Si es texto libre (no es query por campo), agregar wildcards para coincidencias parciales
 		searchQuery = fmt.Sprintf("*%s*", q)
 	}
 

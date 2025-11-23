@@ -33,7 +33,7 @@ func NewCanchaRepository(db *mongo.Database) CanchaRepository {
 	coll := db.Collection(domain.Cancha{}.CollectionName())
 	r := &canchaRepository{collection: coll}
 
-	// Ensure unique composite index on `number` and `type` to enforce DB-level uniqueness
+	// Índice compuesto único number+type para asegurar unicidad en base de datos
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	indexModel := mongo.IndexModel{
@@ -47,7 +47,7 @@ func NewCanchaRepository(db *mongo.Database) CanchaRepository {
 		log.Printf("Warning: failed to create unique index on cancha.number+type: %v", err)
 	}
 
-	// Unique index on name to prevent duplicate names
+	// Índice único en name para evitar nombres duplicados
 	indexName := mongo.IndexModel{
 		Keys:    bson.D{{Key: "name", Value: 1}},
 		Options: options.Index().SetUnique(true),
@@ -69,10 +69,10 @@ func (r *canchaRepository) Create(cancha *domain.Cancha) error {
 
 	_, err := r.collection.InsertOne(ctx, cancha)
 	if err != nil {
-		// Map Mongo duplicate key error to a clear application error
+		// Traducir error de clave duplicada de Mongo a un mensaje entendible
 		var we mongo.WriteException
 		if errors.As(err, &we) {
-			// Inspect error string to determine which index triggered the duplicate
+			// Revisar qué índice disparó el duplicado
 			msg := err.Error()
 			for _, e := range we.WriteErrors {
 				if e.Code == 11000 {
