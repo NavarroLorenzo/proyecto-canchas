@@ -103,8 +103,8 @@ func TestCreateCancha_Success(t *testing.T) {
 	if resp.Name != req.Name || resp.Type != req.Type || resp.Number != req.Number {
 		t.Fatalf("la respuesta no coincide con la solicitud: %+v", resp)
 	}
-	// Precio esperado: base 10 + 5% + fee 8 = 23.5
-	if resp.Price != 23.5 {
+	// Precio esperado: base 10 + 5% + fee 8 = 18.5
+	if resp.Price != 18.5 {
 		t.Fatalf("precio final incorrecto, got %v", resp.Price)
 	}
 	if len(pub.events) != 1 || pub.events[0].Type != "create" {
