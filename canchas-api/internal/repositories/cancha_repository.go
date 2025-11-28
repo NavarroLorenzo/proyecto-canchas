@@ -147,8 +147,6 @@ func (r *canchaRepository) Update(id string, cancha *domain.Cancha) error {
 			"name":        cancha.Name,
 			"type":        cancha.Type,
 			"description": cancha.Description,
-			"location":    cancha.Location,
-			"address":     cancha.Address,
 			"number":      cancha.Number,
 			"price":       cancha.Price,
 			"capacity":    cancha.Capacity,

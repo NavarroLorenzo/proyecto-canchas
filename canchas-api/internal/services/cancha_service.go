@@ -44,14 +44,14 @@ func NewCanchaService(
 func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaResponse, error) {
 	// Validación de negocio: unicidad por número+tipo
 
-	// Validar que no exista otra cancha con el mismo nǧmero y tipo
+	// Validar que no exista otra cancha con el mismo número y tipo
 	if req.Number > 0 && req.Type != "" {
 		existing, err := s.repo.GetByNumberAndType(req.Number, req.Type)
 		if err != nil {
 			return nil, err
 		}
 		if existing != nil {
-			return nil, errors.New("Ya existe una cancha con ese nǧmero y de ese tipo.")
+			return nil, errors.New("Ya existe una cancha con ese número y de ese tipo.")
 		}
 	}
 
@@ -66,24 +66,17 @@ func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaRespons
 		}
 	}
 
-	// Crear la cancha
+	// Crear la cancha (sin location/address)
 	cancha := &domain.Cancha{
 		Name:        req.Name,
 		Type:        req.Type,
 		Description: req.Description,
-		Location:    req.Location,
-		Address:     req.Address,
 		Number:      req.Number,
 		Price:       s.calculatePriceConcurrent(req.Price, req.Capacity),
 		Capacity:    req.Capacity,
 		Available:   req.Available,
 		ImageURL:    req.ImageURL,
-		// �?O ELIMINAR: OwnerID:     req.OwnerID,
-	}
-
-	// Si no se pas�� location desde el admin, asignar un valor por defecto (todas estǭn en el mismo complejo)
-	if cancha.Location == "" {
-		cancha.Location = "Complejo Principal"
+		// TODO ELIMINAR: OwnerID:     req.OwnerID,
 	}
 
 	if err := s.repo.Create(cancha); err != nil {
@@ -149,14 +142,8 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 	if req.Description != "" {
 		existing.Description = req.Description
 	}
-	if req.Location != "" {
-		existing.Location = req.Location
-	}
-	if req.Address != "" {
-		existing.Address = req.Address
-	}
 	if req.Number > 0 || req.Type != "" {
-		// Calcular el nǧmero y tipo resultantes despuǸs de la actualizaci��n
+		// Calcular el número y tipo resultantes después de la actualización
 		newNumber := existing.Number
 		if req.Number > 0 {
 			newNumber = req.Number
@@ -173,14 +160,14 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 				return nil, err
 			}
 			if found != nil && found.ID.Hex() != existing.ID.Hex() {
-				return nil, errors.New("Ya existe una cancha con ese nǧmero y de ese tipo.")
+				return nil, errors.New("Ya existe una cancha con ese número y de ese tipo.")
 			}
 			existing.Number = newNumber
 			existing.Type = newType
 		}
 	}
 
-	// Si cambi�� el nombre, validar unicidad del nombre
+	// Si cambió el nombre, validar unicidad del nombre
 	if req.Name != "" && req.Name != existing.Name {
 		byName, err := s.repo.GetByName(req.Name)
 		if err != nil {
@@ -262,8 +249,6 @@ func (s *canchaService) domainToResponse(cancha *domain.Cancha) *dto.CanchaRespo
 		Name:        cancha.Name,
 		Type:        cancha.Type,
 		Description: cancha.Description,
-		Location:    cancha.Location,
-		Address:     cancha.Address,
 		Number:      cancha.Number,
 		Price:       cancha.Price,
 		Capacity:    cancha.Capacity,

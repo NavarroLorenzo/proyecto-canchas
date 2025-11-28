@@ -88,12 +88,11 @@ func TestCreateCancha_Success(t *testing.T) {
 		Name:        "Cancha Uno",
 		Type:        "futbol",
 		Description: "desc",
-		Location:    "loc",
-		Address:     "addr",
-		Number:      1,
-		Price:       10, // precio base
-		Capacity:    5,  // capacidad baja aplica fee mínimo
-		Available:   true,
+
+		Number:    1,
+		Price:     10, // precio base
+		Capacity:  5,  // capacidad baja aplica fee mínimo
+		Available: true,
 	}
 
 	resp, err := svc.Create(req)
@@ -151,7 +150,7 @@ func TestCreateCancha_DuplicateName(t *testing.T) {
 
 	req := &dto.CreateCanchaRequest{
 		Name:        "Repetida",
-        Type:        "tenis",
+		Type:        "tenis",
 		Description: "desc",
 		Number:      3,
 		Price:       12,

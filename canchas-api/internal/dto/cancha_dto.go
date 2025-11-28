@@ -9,8 +9,6 @@ type CreateCanchaRequest struct {
 	Name        string  `json:"name" binding:"required,min=3"`
 	Type        string  `json:"type" binding:"required,oneof=futbol tenis basquet paddle voley"`
 	Description string  `json:"description" binding:"required"`
-	Location    string  `json:"location" binding:"omitempty"`
-	Address     string  `json:"address" binding:"omitempty"`
 	Number      int     `json:"number" binding:"required,gt=0"`
 	Price       float64 `json:"price" binding:"required,gt=0"`
 	Capacity    int     `json:"capacity" binding:"required,gt=0"`
@@ -23,8 +21,6 @@ type UpdateCanchaRequest struct {
 	Name        string  `json:"name" binding:"omitempty,min=3"`
 	Type        string  `json:"type" binding:"omitempty,oneof=futbol tenis basquet paddle voley"`
 	Description string  `json:"description"`
-	Location    string  `json:"location"`
-	Address     string  `json:"address"`
 	Number      int     `json:"number"`
 	Price       float64 `json:"price" binding:"omitempty,gt=0"`
 	Capacity    int     `json:"capacity" binding:"omitempty,gt=0"`
@@ -38,8 +34,6 @@ type CanchaResponse struct {
 	Name        string  `json:"name"`
 	Type        string  `json:"type"`
 	Description string  `json:"description"`
-	Location    string  `json:"location"`
-	Address     string  `json:"address"`
 	Number      int     `json:"number"`
 	Price       float64 `json:"price"`
 	Capacity    int     `json:"capacity"`

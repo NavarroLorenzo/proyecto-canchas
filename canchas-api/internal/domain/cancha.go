@@ -11,8 +11,6 @@ type Cancha struct {
 	Name        string             `bson:"name" json:"name"`
 	Type        string             `bson:"type" json:"type"` // "futbol", "tenis", "basquet", "paddle", "voley"
 	Description string             `bson:"description" json:"description"`
-	Location    string             `bson:"location" json:"location"`
-	Address     string             `bson:"address" json:"address"`
 	Number      int                `bson:"number" json:"number"`
 	Price       float64            `bson:"price" json:"price"`
 	Capacity    int                `bson:"capacity" json:"capacity"`
