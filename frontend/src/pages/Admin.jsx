@@ -304,6 +304,9 @@ const Admin = () => {
             <h2 style={styles.modalTitle}>
               {editingCancha ? 'Editar Cancha' : 'Nueva Cancha'}
             </h2>
+            <p style={styles.notice}>
+              Se agregará automáticamente un 5% de impuestos y un fee de mantenimiento al precio base.
+            </p>
 
             <form onSubmit={handleSubmitCancha} style={styles.form}>
               {formError && (
@@ -382,6 +385,9 @@ const Admin = () => {
                     step="0.01"
                     style={styles.input}
                   />
+                  <div style={styles.helperText}>
+                    Se sumará 5% de impuestos + fee de mantenimiento al precio base.
+                  </div>
                 </div>
 
                 <div style={styles.formGroup}>
@@ -671,6 +677,17 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '1rem',
+  },
+  notice: {
+    marginTop: '-0.5rem',
+    marginBottom: '0.5rem',
+    fontSize: '0.9rem',
+    color: '#7f8c8d',
+  },
+  helperText: {
+    marginTop: '0.35rem',
+    fontSize: '0.85rem',
+    color: '#7f8c8d',
   },
 };
 

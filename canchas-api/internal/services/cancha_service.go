@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -73,7 +74,7 @@ func (s *canchaService) Create(req *dto.CreateCanchaRequest) (*dto.CanchaRespons
 		Location:    req.Location,
 		Address:     req.Address,
 		Number:      req.Number,
-		Price:       req.Price,
+		Price:       s.calculatePriceConcurrent(req.Price, req.Capacity),
 		Capacity:    req.Capacity,
 		Available:   req.Available,
 		ImageURL:    req.ImageURL,
@@ -196,6 +197,8 @@ func (s *canchaService) Update(id string, req *dto.UpdateCanchaRequest) (*dto.Ca
 	if req.Capacity > 0 {
 		existing.Capacity = req.Capacity
 	}
+	// Recalcular precio final con concurrencia
+	existing.Price = s.calculatePriceConcurrent(existing.Price, existing.Capacity)
 	if req.Available != nil {
 		existing.Available = *req.Available
 	}
@@ -266,8 +269,40 @@ func (s *canchaService) domainToResponse(cancha *domain.Cancha) *dto.CanchaRespo
 		Capacity:    cancha.Capacity,
 		Available:   cancha.Available,
 		ImageURL:    cancha.ImageURL,
-		// �?O ELIMINAR: OwnerID:     cancha.OwnerID,
-		CreatedAt: cancha.CreatedAt,
-		UpdatedAt: cancha.UpdatedAt,
+		CreatedAt:   cancha.CreatedAt,
+		UpdatedAt:   cancha.UpdatedAt,
 	}
+}
+
+// calculatePriceConcurrent suma recargos en paralelo (impuesto + mantenimiento) y retorna el precio final.
+func (s *canchaService) calculatePriceConcurrent(base float64, capacity int) float64 {
+	var wg sync.WaitGroup
+	contribs := make(chan float64, 2)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		contribs <- base * 0.05
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fee := 8.0
+		if capacity > 15 {
+			fee = 12.0
+		}
+		contribs <- fee
+	}()
+
+	go func() {
+		wg.Wait()
+		close(contribs)
+	}()
+
+	total := base
+	for c := range contribs {
+		total += c
+	}
+	return total
 }

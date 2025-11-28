@@ -313,6 +313,9 @@ const CanchaDetails = () => {
             <span style={styles.priceLabel}>Precio por turno:</span>
             <span style={styles.price}>${cancha.price}</span>
           </div>
+          <p style={styles.priceNote}>
+            El precio mostrado incluye 5% de impuestos y un fee de mantenimiento.
+          </p>
         </div>
 
         {/* Formulario de reserva */}
@@ -587,6 +590,11 @@ const styles = {
     fontSize: '2rem',
     fontWeight: 'bold',
     color: '#27ae60',
+  },
+  priceNote: {
+    marginTop: '0.5rem',
+    fontSize: '0.95rem',
+    color: '#7f8c8d',
   },
   rightSection: {
     position: 'sticky',

@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// mockCanchaRepository is an in-memory implementation of CanchaRepository for tests.
+// mockCanchaRepository implementa el repositorio en memoria para probar el servicio sin Mongo.
 type mockCanchaRepository struct {
 	canchas map[string]*domain.Cancha
 }
@@ -61,7 +61,7 @@ func (m *mockCanchaRepository) GetByName(name string) (*domain.Cancha, error) {
 func (m *mockCanchaRepository) Update(id string, cancha *domain.Cancha) error { return nil }
 func (m *mockCanchaRepository) Delete(id string) error                        { return nil }
 
-// mockPublisher captures published events without hitting RabbitMQ.
+// mockPublisher guarda eventos publicados para verificar que se emitan.
 type mockPublisher struct {
 	events []messaging.Event
 }
@@ -73,12 +73,13 @@ func (m *mockPublisher) PublishEvent(e messaging.Event) error {
 
 func (m *mockPublisher) Close() error { return nil }
 
-// mockReservaClient is unused in current tests but satisfies the interface.
+// mockReservaClient cumple la interfaz y permite extender tests sin llamar a reservas reales.
 type mockReservaClient struct{}
 
 func (m *mockReservaClient) DeleteByCanchaID(id string) error { return nil }
 
 func TestCreateCancha_Success(t *testing.T) {
+	// Caso feliz: crea cancha nueva y emite evento create
 	repo := newMockRepo()
 	pub := &mockPublisher{}
 	svc := NewCanchaService(repo, pub, &mockReservaClient{})
@@ -90,26 +91,30 @@ func TestCreateCancha_Success(t *testing.T) {
 		Location:    "loc",
 		Address:     "addr",
 		Number:      1,
-		Price:       10,
-		Capacity:    5,
+		Price:       10, // precio base
+		Capacity:    5,  // capacidad baja aplica fee mínimo
 		Available:   true,
 	}
 
 	resp, err := svc.Create(req)
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("se esperaba sin error, llegó %v", err)
 	}
 	if resp.Name != req.Name || resp.Type != req.Type || resp.Number != req.Number {
-		t.Fatalf("response does not match request: %+v", resp)
+		t.Fatalf("la respuesta no coincide con la solicitud: %+v", resp)
+	}
+	// Precio esperado: base 10 + 5% + fee 8 = 23.5
+	if resp.Price != 23.5 {
+		t.Fatalf("precio final incorrecto, got %v", resp.Price)
 	}
 	if len(pub.events) != 1 || pub.events[0].Type != "create" {
-		t.Fatalf("expected one create event, got %+v", pub.events)
+		t.Fatalf("se esperaba un evento create, llegaron %+v", pub.events)
 	}
 }
 
 func TestCreateCancha_DuplicateNumberAndType(t *testing.T) {
 	repo := newMockRepo()
-	// Seed repository with one cancha to trigger duplicate validation.
+	// Caso de duplicado por número+tipo
 	_ = repo.Create(&domain.Cancha{
 		Name:     "Existente",
 		Type:     "futbol",
@@ -129,7 +134,7 @@ func TestCreateCancha_DuplicateNumberAndType(t *testing.T) {
 	}
 
 	if _, err := svc.Create(req); err == nil {
-		t.Fatalf("expected duplicate number/type error, got nil")
+		t.Fatalf("se esperaba error de número/tipo duplicado, llegó nil")
 	}
 }
 
@@ -154,6 +159,6 @@ func TestCreateCancha_DuplicateName(t *testing.T) {
 	}
 
 	if _, err := svc.Create(req); err == nil {
-		t.Fatalf("expected duplicate name error, got nil")
+		t.Fatalf("se esperaba error de nombre duplicado, llegó nil")
 	}
 }
